@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-wp-config-backup"
+info:
+  title: "WordPress wp-config backup exposed"
+  severity: "critical"
+  cwe: "CWE-538"
+  what: "The file /wp-config.php.bak is publicly downloadable. Files of this kind hold credentials, keys or connection strings."
+  why: "Anyone on the internet can read the credentials inside and use them to log in to your database, cloud account or third-party services as you."
+  fix: "Remove the file from the web root immediately, rotate every credential it contains, and add a web-server rule that denies access to dotfiles and configuration files."
+  tags: ["exposure", "secrets", "wordpress"]
+safety: safe
+http:
+  - method: GET
+    path: ["/wp-config.php.bak", "/wp-config.php~", "/wp-config.php.save", "/wp-config.php.old", "/wp-config.txt", "/wp-config.php.orig"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        words: ["DB_PASSWORD"]

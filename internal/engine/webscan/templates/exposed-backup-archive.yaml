@@ -1,0 +1,21 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-backup-archive"
+info:
+  title: "Backup archive exposed"
+  severity: "high"
+  cwe: "CWE-538"
+  what: "A backup or dump file at /backup.zip is downloadable."
+  why: "Backups contain your database contents or source code, often including user data and credentials."
+  fix: "Delete the file from the web root, store backups outside it with restricted permissions, and rotate any credentials inside."
+  tags: ["exposure", "backup"]
+safety: safe
+http:
+  - method: GET
+    path: ["/backup.zip", "/backup.tar.gz", "/backup.tgz", "/site.zip", "/www.zip", "/html.zip", "/public_html.zip", "/backup.rar"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: header
+        name: "Content-Type"
+        regex: ["(?i)(zip|gzip|x-tar|x-rar|octet-stream)"]

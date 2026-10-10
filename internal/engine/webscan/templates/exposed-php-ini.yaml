@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-php-ini"
+info:
+  title: "php.ini exposed"
+  severity: "medium"
+  cwe: "CWE-538"
+  what: "The configuration file /php.ini is served to anyone who asks for it."
+  why: "Configuration files reveal internal hostnames, settings and sometimes credentials, which makes targeted attacks much easier."
+  fix: "Move configuration out of the web root or deny access to it in the web server, then check whether it contained any secret that must be rotated."
+  tags: ["exposure", "php"]
+safety: safe
+http:
+  - method: GET
+    path: ["/php.ini", "/.user.ini"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(?m)^\\s*(display_errors|memory_limit|upload_max_filesize|open_basedir)\\s*="]

@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "nginx-status"
+info:
+  title: "nginx stub_status page exposed"
+  severity: "low"
+  cwe: "CWE-200"
+  what: "A server status or metrics page is public at /nginx_status."
+  why: "It discloses internal addresses, request paths and load information that help an attacker map the system."
+  fix: "Restrict the status endpoint to localhost or monitoring hosts only."
+  tags: ["status", "nginx"]
+safety: safe
+http:
+  - method: GET
+    path: ["/nginx_status", "/nginx-status", "/status"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        words: ["Active connections:"]

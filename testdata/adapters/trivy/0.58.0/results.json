@@ -1,0 +1,82 @@
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2026-01-10T10:00:00Z",
+  "ArtifactName": "/repo/root",
+  "ArtifactType": "filesystem",
+  "Metadata": {"ImageConfig": {"architecture": "", "created": "0001-01-01T00:00:00Z", "os": "", "rootfs": {"type": "", "diff_ids": null}, "config": {}}},
+  "Results": [
+    {
+      "Target": "package-lock.json",
+      "Class": "lang-pkgs",
+      "Type": "npm",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2020-8203",
+          "PkgID": "lodash@4.17.20",
+          "PkgName": "lodash",
+          "PkgIdentifier": {"PURL": "pkg:npm/lodash@4.17.20", "UID": "abc"},
+          "InstalledVersion": "4.17.20",
+          "FixedVersion": "4.17.21",
+          "Status": "fixed",
+          "Layer": {},
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2020-8203",
+          "DataSource": {"ID": "ghsa", "Name": "GitHub Security Advisory npm", "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"},
+          "Title": "nodejs-lodash: prototype pollution in zipObjectDeep function",
+          "Description": "Prototype pollution attack when using _.zipObjectDeep in lodash before 4.17.20.",
+          "Severity": "HIGH",
+          "CweIDs": ["CWE-770", "CWE-1321"],
+          "CVSS": {
+            "ghsa": {"V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:H", "V3Score": 7.4},
+            "nvd": {"V2Vector": "AV:N/AC:L/Au:N/C:N/I:P/A:P", "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:H", "V2Score": 6.4, "V3Score": 7.4}
+          },
+          "References": ["https://github.com/lodash/lodash/issues/4874", "https://nvd.nist.gov/vuln/detail/CVE-2020-8203"],
+          "PublishedDate": "2020-07-15T17:15:00Z",
+          "LastModifiedDate": "2022-09-15T21:15:00Z"
+        }
+      ]
+    },
+    {
+      "Target": "Dockerfile",
+      "Class": "config",
+      "Type": "dockerfile",
+      "MisconfSummary": {"Successes": 20, "Failures": 1, "Exceptions": 0},
+      "Misconfigurations": [
+        {
+          "Type": "Dockerfile Security Check",
+          "ID": "DS002",
+          "AVDID": "AVD-DS-0002",
+          "Title": "Image user should not be 'root'",
+          "Description": "Running containers with 'root' user can lead to a container escape situation.",
+          "Message": "Specify at least 1 USER command in Dockerfile with non-root user as argument",
+          "Namespace": "builtin.dockerfile.DS002",
+          "Query": "data.builtin.dockerfile.DS002.deny",
+          "Resolution": "Add 'USER <non root user name>' line to the Dockerfile",
+          "Severity": "HIGH",
+          "PrimaryURL": "https://avd.aquasec.com/misconfig/ds002",
+          "References": ["https://docs.docker.com/develop/develop-images/dockerfile_best-practices/", "https://avd.aquasec.com/misconfig/ds002"],
+          "Status": "FAIL",
+          "Layer": {},
+          "CauseMetadata": {"Provider": "Dockerfile", "Service": "general", "Code": {"Lines": null}}
+        }
+      ]
+    },
+    {
+      "Target": "config/settings.py",
+      "Class": "secret",
+      "Secrets": [
+        {
+          "RuleID": "aws-access-key-id",
+          "Category": "AWS",
+          "Severity": "CRITICAL",
+          "Title": "AWS Access Key ID",
+          "StartLine": 3,
+          "EndLine": 3,
+          "Code": {"Lines": null},
+          "Match": "AWS_ACCESS_KEY = \"AKIA****************\"",
+          "Layer": {}
+        }
+      ]
+    }
+  ]
+}

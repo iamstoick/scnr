@@ -1,0 +1,103 @@
+id: web.header.csp-missing
+engine: webscan
+title: Content-Security-Policy header missing
+severity: low
+cwe: CWE-1021
+what: The page is served without a Content-Security-Policy header.
+why: CSP tells browsers which scripts, styles and frames a page may load. Without it, a single cross-site scripting bug lets an attacker run any script they like in your users' browsers.
+fix: Add a Content-Security-Policy header. Start in report-only mode (Content-Security-Policy-Report-Only) with a policy such as "default-src 'self'", fix the violations it reports, then enforce it.
+safety: safe
+tags: [web, headers]
+---
+id: web.header.hsts-missing
+engine: webscan
+title: Strict-Transport-Security header missing on HTTPS site
+severity: low
+cwe: CWE-319
+what: The HTTPS response does not include a Strict-Transport-Security (HSTS) header.
+why: Without HSTS a browser may still try plain HTTP first on later visits, which lets an attacker on the same network downgrade or intercept the connection.
+fix: >-
+  Send "Strict-Transport-Security: max-age=31536000; includeSubDomains" on every HTTPS response once you are sure the whole site works over HTTPS.
+safety: safe
+tags: [web, headers, tls]
+---
+id: web.header.xcto-missing
+engine: webscan
+title: X-Content-Type-Options header missing
+severity: low
+cwe: CWE-16
+what: >-
+  The response does not include "X-Content-Type-Options: nosniff".
+why: Without it, some browsers guess a file's type from its content, so an uploaded file that claims to be an image can be executed as script.
+fix: >-
+  Add the header "X-Content-Type-Options: nosniff" to every response.
+safety: safe
+tags: [web, headers]
+---
+id: web.header.frame-protection-missing
+engine: webscan
+title: No protection against the page being framed (clickjacking)
+severity: low
+cwe: CWE-1021
+what: Neither an X-Frame-Options header nor a CSP frame-ancestors directive restricts which sites may embed this page in a frame.
+why: A malicious site can load your page invisibly in a frame and trick users into clicking buttons on it (clickjacking).
+fix: >-
+  Add "Content-Security-Policy: frame-ancestors 'self'" (or 'none'), and "X-Frame-Options: SAMEORIGIN" for older browsers.
+safety: safe
+tags: [web, headers]
+---
+id: web.cookie.insecure-flags
+engine: webscan
+title: Cookie set without protective flags
+severity: medium
+cwe: CWE-614
+what: A cookie is set without one or more of the Secure, HttpOnly and SameSite attributes.
+why: Without Secure the cookie can be sent over plain HTTP and intercepted; without HttpOnly any script on the page (including injected ones) can read it; without SameSite it is sent on cross-site requests, enabling CSRF.
+fix: Set session and authentication cookies with "Secure; HttpOnly; SameSite=Lax" (or Strict). Only cookies that JavaScript genuinely needs should omit HttpOnly.
+safety: safe
+tags: [web, cookies]
+---
+id: web.server-version-disclosure
+engine: webscan
+title: Software version disclosed in a response header
+severity: info
+cwe: CWE-200
+what: A response header (Server, X-Powered-By or similar) reveals the exact software version in use.
+why: Knowing the exact version lets an attacker look up known vulnerabilities for it instead of guessing. It does not create a vulnerability by itself.
+fix: Configure the server to omit version details (e.g. "ServerTokens Prod" for Apache, "server_tokens off" for nginx, remove X-Powered-By in the application).
+safety: safe
+tags: [web, headers, disclosure]
+---
+id: web.cors.credentials-any-origin
+engine: webscan
+title: CORS allows credentials from any origin
+severity: medium
+cwe: CWE-942
+what: The server answers cross-origin requests with Access-Control-Allow-Credentials true while allowing any origin (a wildcard or by reflecting the request's Origin).
+why: Any website a logged-in user visits can read responses from this site with the user's cookies, which exposes their data and actions.
+fix: Only reflect origins from an explicit allow list, and never combine Access-Control-Allow-Credentials with a wildcard or an unchecked reflected origin.
+safety: safe
+tags: [web, cors]
+---
+id: web.mixed-content
+engine: webscan
+title: HTTPS page loads resources over plain HTTP
+severity: low
+cwe: CWE-319
+what: The HTTPS page references scripts, styles or images with http:// URLs.
+why: Those resources can be altered by anyone on the network path; browsers block some of them, which also breaks the page.
+fix: >-
+  Reference all resources with https:// (or protocol-relative) URLs and add "Content-Security-Policy: upgrade-insecure-requests".
+safety: safe
+tags: [web, tls]
+---
+id: web.redirect-out-of-scope
+engine: webscan
+title: Redirect points outside the authorised scope
+severity: info
+cwe: CWE-601
+what: The server responded with a redirect to a location that is not within the scanned scope, so scnr did not follow it.
+why: Nothing was scanned at the destination. If the destination is yours, add it to scope.allow and re-run; if it is not, this is only informational.
+fix: Review the redirect target; if it should be in scope, add it to scnr.yaml and scan it explicitly.
+safety: safe
+tags: [web, scope]

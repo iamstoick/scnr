@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-jenkinsfile"
+info:
+  title: "Jenkinsfile exposed"
+  severity: "low"
+  cwe: "CWE-200"
+  what: "The CI/CD configuration /Jenkinsfile is publicly readable."
+  why: "It reveals build steps, internal service names and sometimes variable names that hint at secrets."
+  fix: "Exclude CI configuration from the deployed web root."
+  tags: ["exposure", "ci"]
+safety: safe
+http:
+  - method: GET
+    path: ["/Jenkinsfile"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(pipeline\\s*\\{|node\\s*(\\(|\\{))"]

@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-dockerfile"
+info:
+  title: "Dockerfile exposed"
+  severity: "medium"
+  cwe: "CWE-538"
+  what: "The configuration file /Dockerfile is served to anyone who asks for it."
+  why: "Configuration files reveal internal hostnames, settings and sometimes credentials, which makes targeted attacks much easier."
+  fix: "Move configuration out of the web root or deny access to it in the web server, then check whether it contained any secret that must be rotated."
+  tags: ["exposure", "docker"]
+safety: safe
+http:
+  - method: GET
+    path: ["/Dockerfile", "/dockerfile", "/Dockerfile.prod"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(?m)^FROM\\s+\\S+"]

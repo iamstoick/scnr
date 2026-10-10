@@ -1,0 +1,27 @@
+# gitleaks configuration: extend the default rules and allowlist the places
+# where credential-shaped strings are expected, so a real leak stands out.
+#
+# - testdata/ holds fixtures with deliberately fake secrets (the engines
+#   must detect them; the values are marked "Fake"/"not-a-real").
+# - *_test.go builds the same fixtures inline.
+# - iac rule IDs such as "iac.tf.s3-no-encryption" trip the generic-api-key
+#   rule in internal/engine/iac/terraform.go.
+
+title = "scnr"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "fixtures, tests and rule identifiers"
+paths = [
+  '''^testdata/''',
+  '''_test\.go$''',
+  '''^internal/engine/image/imagetest/''',
+  '''^internal/adapter/adaptertest/''',
+]
+regexes = [
+  '''iac\.(tf|docker|k8s)\.[a-z0-9-]+''',
+  '''FakeTokenValue''',
+  '''not-a-real-pw''',
+]

@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-svn-entries"
+info:
+  title: "Subversion metadata exposed (.svn)"
+  severity: "high"
+  cwe: "CWE-538"
+  what: "Version-control metadata at /.svn/entries is exposed, which usually means the whole repository can be downloaded."
+  why: "Attackers reconstruct the full source code and history from exposed repositories, including deleted files and committed secrets."
+  fix: "Deny access to .git, .svn, .hg and similar directories in the web server (or deploy without them) and rotate any secret that was ever committed."
+  tags: ["exposure", "vcs", "svn"]
+safety: safe
+http:
+  - method: GET
+    path: ["/.svn/entries", "/.svn/wc.db"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(^\\d+\\s*$|SQLite format 3|dir\\s*$)"]

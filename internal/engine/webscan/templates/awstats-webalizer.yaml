@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "awstats-webalizer"
+info:
+  title: "Web statistics application exposed"
+  severity: "low"
+  cwe: "CWE-200"
+  what: "A server status or metrics page is public at /awstats/awstats.pl."
+  why: "It discloses internal addresses, request paths and load information that help an attacker map the system."
+  fix: "Restrict the status endpoint to localhost or monitoring hosts only."
+  tags: ["status"]
+safety: safe
+http:
+  - method: GET
+    path: ["/awstats/awstats.pl", "/webalizer/", "/stats/", "/usage/"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(AWStats|Webalizer|Usage Statistics for)"]

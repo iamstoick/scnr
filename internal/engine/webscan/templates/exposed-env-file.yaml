@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-env-file"
+info:
+  title: "Environment file (.env) exposed"
+  severity: "critical"
+  cwe: "CWE-538"
+  what: "The file /.env is publicly downloadable. Files of this kind hold credentials, keys or connection strings."
+  why: "Anyone on the internet can read the credentials inside and use them to log in to your database, cloud account or third-party services as you."
+  fix: "Remove the file from the web root immediately, rotate every credential it contains, and add a web-server rule that denies access to dotfiles and configuration files."
+  tags: ["exposure", "secrets"]
+safety: safe
+http:
+  - method: GET
+    path: ["/.env", "/.env.local", "/.env.production", "/.env.bak", "/.env.backup", "/.env.dev"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(?m)^[A-Z][A-Z0-9_]+=.+$"]

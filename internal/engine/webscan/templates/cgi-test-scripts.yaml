@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "cgi-test-scripts"
+info:
+  title: "CGI test or printenv script exposed"
+  severity: "medium"
+  cwe: "CWE-200"
+  what: "A debugging or diagnostics endpoint is enabled at /cgi-bin/test-cgi."
+  why: "Debug endpoints leak configuration, environment variables, request data and sometimes allow code execution."
+  fix: "Disable debug and profiler features in production and restrict any remaining diagnostics endpoints to internal networks."
+  tags: ["debug", "cgi"]
+safety: safe
+http:
+  - method: GET
+    path: ["/cgi-bin/test-cgi", "/cgi-bin/printenv", "/cgi-bin/printenv.pl"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(SERVER_SOFTWARE|DOCUMENT_ROOT|HTTP_USER_AGENT)"]

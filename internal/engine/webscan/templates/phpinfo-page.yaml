@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "phpinfo-page"
+info:
+  title: "phpinfo() page exposed"
+  severity: "medium"
+  cwe: "CWE-200"
+  what: "A debugging or diagnostics endpoint is enabled at /phpinfo.php."
+  why: "Debug endpoints leak configuration, environment variables, request data and sometimes allow code execution."
+  fix: "Disable debug and profiler features in production and restrict any remaining diagnostics endpoints to internal networks."
+  tags: ["debug", "php"]
+safety: safe
+http:
+  - method: GET
+    path: ["/phpinfo.php", "/info.php", "/php.php", "/test.php", "/i.php", "/pi.php"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(phpinfo\\(\\)|PHP Version\\s*</)"]

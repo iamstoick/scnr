@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-laravel-log"
+info:
+  title: "Laravel application log exposed"
+  severity: "high"
+  cwe: "CWE-532"
+  what: "A backup or dump file at /storage/logs/laravel.log is downloadable."
+  why: "Backups contain your database contents or source code, often including user data and credentials."
+  fix: "Delete the file from the web root, store backups outside it with restricted permissions, and rotate any credentials inside."
+  tags: ["exposure", "logs", "laravel"]
+safety: safe
+http:
+  - method: GET
+    path: ["/storage/logs/laravel.log"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["\\[\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\] \\w+\\.(ERROR|INFO|DEBUG|WARNING)"]

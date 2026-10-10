@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "solr-admin"
+info:
+  title: "Apache Solr admin interface exposed"
+  severity: "high"
+  cwe: "CWE-284"
+  what: "An administrative or management interface is reachable at /solr/."
+  why: "Management consoles are high-value targets: default or weak credentials, or a missing login, give full control of the application or server."
+  fix: "Restrict the interface to trusted networks (VPN or allow-listed IPs), require strong authentication and MFA, and remove it if it is not needed."
+  tags: ["admin", "search"]
+safety: safe
+http:
+  - method: GET
+    path: ["/solr/", "/solr/admin/", "/solr/admin/cores"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(Solr Admin|solr-admin|\"responseHeader\")"]

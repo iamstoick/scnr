@@ -1,0 +1,329 @@
+id: code.tls-verify-disabled
+engine: codecheck
+title: TLS certificate verification disabled
+severity: high
+cwe: CWE-295
+what: Code turns off TLS certificate validation (verify=False, rejectUnauthorized false, InsecureSkipVerify true, VERIFY_NONE, CURLOPT_SSL_VERIFYPEER false).
+why: Without verification any network position (coffee-shop Wi-Fi, a compromised router, a cloud neighbour) can impersonate the server and read or alter the traffic.
+fix: Remove the override and trust the proper CA; for self-signed internal services pin the specific certificate instead.
+safety: safe
+tags: [code, tls]
+---
+id: code.eval-dynamic
+engine: codecheck
+title: Dynamic code evaluation (eval/exec)
+severity: high
+cwe: CWE-95
+what: eval() or exec() is called; if any part of the evaluated string comes from input, this is remote code execution.
+why: Dynamic evaluation is the shortest path from an injection to full compromise and defeats every static analysis tool.
+fix: Replace with a parser or lookup table for the specific behaviour needed; never pass user-influenced strings to eval.
+safety: safe
+tags: [code, injection]
+---
+id: code.sql-concat
+engine: codecheck
+title: SQL built by string concatenation or formatting
+severity: high
+cwe: CWE-89
+what: A SELECT/INSERT/UPDATE/DELETE string is concatenated, %-formatted or f-string interpolated rather than parameterised.
+why: If any interpolated value is user-controlled this is SQL injection, still the most exploited web vulnerability class.
+fix: Use parameterised queries / prepared statements (placeholders with bound values) or the ORM's query builder.
+safety: safe
+tags: [code, injection, sql]
+---
+id: code.debug-true-config
+engine: codecheck
+title: Debug mode enabled in configuration
+severity: medium
+cwe: CWE-489
+what: A config or settings file sets DEBUG/debug/display_errors to true.
+why: Debug modes expose stack traces, environment variables and sometimes interactive consoles to anyone who triggers an error.
+fix: Default debug to false and enable it only via a local environment variable that is never set in production.
+safety: safe
+tags: [code, config]
+---
+id: code.weak-hash
+engine: codecheck
+title: MD5 or SHA-1 used near password handling
+severity: high
+cwe: CWE-328
+what: MD5 or SHA-1 appears on the same line as a password/secret variable.
+why: Both are fast, unsalted-by-default digests; leaked hashes are cracked at billions of guesses per second.
+fix: Use a password hashing function designed to be slow (bcrypt, scrypt, Argon2id) with a per-user salt.
+safety: safe
+tags: [code, crypto]
+---
+id: code.cors-wildcard
+engine: codecheck
+title: CORS allows any origin
+severity: medium
+cwe: CWE-942
+what: Access-Control-Allow-Origin is set to "*" (or the CORS middleware origin is "*").
+why: Any website can read responses from this API in a visitor's browser; combined with credentials or ambient auth this leaks data.
+fix: Allow an explicit list of trusted origins and never combine wildcard origins with credentials.
+safety: safe
+tags: [code, web]
+---
+id: code.bind-all-interfaces
+engine: codecheck
+title: Service binds to 0.0.0.0
+severity: low
+cwe: CWE-668
+what: A listener binds to all interfaces.
+why: Development servers and admin interfaces bound to 0.0.0.0 are reachable from every network the host is on, not just localhost.
+fix: Bind to 127.0.0.1 unless external access is required, and front it with a reverse proxy when it is.
+safety: safe
+tags: [code, network]
+---
+id: code.shell-injection
+engine: codecheck
+title: Shell command built from a string
+severity: high
+cwe: CWE-78
+what: A command is run through a shell (shell=True, os.system, sh -c, shell_exec, template-literal exec).
+why: Any user-influenced part of the command string lets an attacker run arbitrary commands on the server.
+fix: Call the program directly with an argument array (no shell), and validate each argument.
+safety: safe
+tags: [code, injection]
+---
+id: code.insecure-random-secret
+engine: codecheck
+title: Non-cryptographic random used for a secret
+severity: medium
+cwe: CWE-338
+what: Math.random() or the random module generates something named token/secret/key/nonce/salt/session.
+why: These generators are predictable; an attacker who observes a few outputs can predict the next session ID or reset token.
+fix: Use crypto.randomBytes / secrets.token_* / crypto/rand for anything security-relevant.
+safety: safe
+tags: [code, crypto]
+---
+id: code.weak-cipher
+engine: codecheck
+title: Weak or ECB-mode cipher
+severity: medium
+cwe: CWE-327
+what: DES, 3DES, RC4, RC2, Blowfish or AES in ECB mode is selected.
+why: These ciphers or modes are broken or leak plaintext structure; data they protect should be considered readable.
+fix: Use AES-256-GCM or ChaCha20-Poly1305 through a high-level library (libsodium, cryptography.Fernet, Go crypto/cipher AEAD).
+safety: safe
+tags: [code, crypto]
+---
+id: code.jwt-none-algorithm
+engine: codecheck
+title: JWT "none" algorithm accepted
+severity: critical
+cwe: CWE-347
+what: A JWT library is configured with algorithm "none" or allows it in the accepted algorithms list.
+why: With "none" accepted anyone can forge a token with any claims; this is a complete authentication bypass.
+fix: Pin a single strong algorithm (RS256/ES256/HS256) in the verification call and reject anything else.
+safety: safe
+tags: [code, auth]
+---
+id: code.jwt-verify-disabled
+engine: codecheck
+title: JWT signature or expiry verification disabled
+severity: critical
+cwe: CWE-347
+what: jwt.decode is called with verify=False / verify_signature False, or ignoreExpiration true.
+why: An unverified token is just user input; any claim in it (user ID, role) can be set by the attacker.
+fix: Verify signatures and expiry on every request; use decode-without-verify only for logging of untrusted claims.
+safety: safe
+tags: [code, auth]
+---
+id: code.xxe-enabled
+engine: codecheck
+title: XML parser allows external entities
+severity: high
+cwe: CWE-611
+what: An XML parser is configured to resolve external entities or DOCTYPE declarations.
+why: XML external entities let a document read local files or make server-side requests (XXE/SSRF).
+fix: Disable DTDs and external entity resolution (disallow-doctype-decl true, resolve_entities False) or use defusedxml.
+safety: safe
+tags: [code, xml]
+---
+id: code.unsafe-deserialization
+engine: codecheck
+title: Deserialisation of possibly untrusted data
+severity: high
+cwe: CWE-502
+what: pickle.load(s), marshal.loads, yaml.load without a safe Loader, or PHP unserialize is used.
+why: These formats can instantiate arbitrary objects; untrusted input becomes code execution.
+fix: Use data-only formats (JSON, yaml.safe_load) and validate the schema after parsing.
+safety: safe
+tags: [code, deserialization]
+---
+id: code.path-from-request
+engine: codecheck
+title: File path built from request input
+severity: high
+cwe: CWE-22
+what: A file open/read/send call takes a path containing request parameters directly.
+why: Dot-dot-slash sequences in the parameter read files outside the intended directory (path traversal).
+fix: Map the parameter to an allow-listed name or canonicalise and check the result stays under the base directory.
+safety: safe
+tags: [code, injection]
+---
+id: code.unescaped-html
+engine: codecheck
+title: HTML inserted without escaping
+severity: medium
+cwe: CWE-79
+what: "dangerouslySetInnerHTML, innerHTML assignment, v-html, |safe, {!! !!} or bypassSecurityTrustHtml puts raw HTML into the page."
+why: If any part of the HTML comes from users this is cross-site scripting.
+fix: Render text through the framework's escaping, or sanitise with an allow-list sanitiser (DOMPurify, bleach) first.
+safety: safe
+tags: [code, xss]
+---
+id: code.open-redirect
+engine: codecheck
+title: Redirect target taken from request input
+severity: medium
+cwe: CWE-601
+what: A redirect call uses a request parameter as the destination.
+why: Attackers craft links on your domain that land users on phishing pages.
+fix: Allow only relative paths or a fixed list of destinations; validate before redirecting.
+safety: safe
+tags: [code, web]
+---
+id: code.cookie-insecure
+engine: codecheck
+title: Cookie without Secure or HttpOnly
+severity: medium
+cwe: CWE-614
+what: Cookie options set secure or httpOnly to false (or SESSION_COOKIE_SECURE = False).
+why: Session cookies without Secure travel over plain HTTP; without HttpOnly any XSS can steal them.
+fix: Set secure, httpOnly and sameSite on every session cookie.
+safety: safe
+tags: [code, web, session]
+---
+id: code.csrf-disabled
+engine: codecheck
+title: CSRF protection disabled
+severity: medium
+cwe: CWE-352
+what: CSRF protection is turned off globally or for a handler (csrf false, WTF_CSRF_ENABLED False, csrf().disable(), @csrf_exempt).
+why: Without CSRF tokens, a malicious page can make the browser submit state-changing requests as the logged-in user.
+fix: Keep CSRF protection on for all cookie-authenticated, state-changing endpoints; exempt only token-authenticated APIs.
+safety: safe
+tags: [code, web]
+---
+id: code.insecure-temp-file
+engine: codecheck
+title: Fixed path under /tmp
+severity: low
+cwe: CWE-377
+what: Code uses a hard-coded /tmp/... path.
+why: Predictable temp paths allow symlink attacks and data exposure between users on shared hosts.
+fix: Use the language's secure temp-file API (mkstemp, os.CreateTemp, tempfile.NamedTemporaryFile).
+safety: safe
+tags: [code, filesystem]
+---
+id: code.plain-http-url
+engine: codecheck
+title: Plain http:// URL to an external host
+severity: low
+cwe: CWE-319
+what: A string literal contains an http:// URL that is not localhost, a documentation domain or an XML namespace.
+why: Traffic to it can be read or modified in transit; package and update URLs over http are a classic supply-chain weakness.
+fix: Use https:// (nearly every service supports it) or pin and verify the content you fetch.
+safety: safe
+tags: [code, network]
+---
+id: code.ssrf-user-url
+engine: codecheck
+title: Outbound request to a URL from request input
+severity: high
+cwe: CWE-918
+what: An HTTP client call takes its URL from request parameters.
+why: The server can be made to fetch internal addresses (cloud metadata, admin panels) on the attacker's behalf.
+fix: Allow-list destination hosts, resolve and check addresses before connecting, and block private ranges.
+safety: safe
+tags: [code, ssrf]
+---
+id: code.sensitive-logging
+engine: codecheck
+title: Credential-like value written to a log
+severity: medium
+cwe: CWE-532
+what: A log/print call includes a variable named password, secret, token or api key.
+why: Logs are widely readable, shipped to third parties and retained for years; secrets in them outlive every rotation.
+fix: Remove the value from the log line or mask it; log identifiers, not credentials.
+safety: safe
+tags: [code, logging]
+---
+id: code.curl-pipe-shell
+engine: codecheck
+title: Remote script piped to a shell
+severity: medium
+cwe: CWE-494
+what: A script fetches a URL with curl/wget and pipes it straight into sh/bash.
+why: Whoever controls the URL (or the connection, for http) runs code on every machine that executes the script.
+fix: Download to a file, verify a checksum or signature, then execute.
+safety: safe
+tags: [code, supply-chain]
+---
+id: code.world-writable-permissions
+engine: codecheck
+title: File permissions set to 777
+severity: medium
+cwe: CWE-732
+what: chmod 777 (or mode 0o777) makes a path readable, writable and executable by every user.
+why: Any local user or compromised service can modify the file or drop executables into the directory.
+fix: Use the least permissive mode that works (755 for directories, 644 or 600 for files).
+safety: safe
+tags: [code, filesystem]
+---
+id: code.timing-unsafe-compare
+engine: codecheck
+title: HMAC/signature compared with ==
+severity: low
+cwe: CWE-208
+what: A variable named hmac/signature/digest is compared with a plain equality operator.
+why: Early-exit comparison leaks how many leading bytes matched through timing, letting an attacker forge a signature byte by byte.
+fix: Use a constant-time comparison (hmac.compare_digest, crypto.timingSafeEqual, subtle.ConstantTimeCompare).
+safety: safe
+tags: [code, crypto]
+---
+id: code.legacy-tls-version
+engine: codecheck
+title: Legacy TLS/SSL protocol version selected
+severity: medium
+cwe: CWE-326
+what: Code references TLS 1.0/1.1, SSLv2/SSLv3 or a client option that permits them.
+why: These versions have known attacks (POODLE, BEAST) and are rejected by modern clients and compliance baselines.
+fix: Require TLS 1.2 or later (tls.VersionTLS12, PROTOCOL_TLS_CLIENT, minVersion TLSv1.2).
+safety: safe
+tags: [code, tls]
+---
+id: code.graphql-introspection
+engine: codecheck
+title: GraphQL introspection enabled explicitly
+severity: low
+cwe: CWE-200
+what: "A GraphQL server is configured with introspection: true."
+why: Introspection maps the entire schema for attackers; it is useful in development, not in production.
+fix: Enable introspection only when NODE_ENV/ENV is development.
+safety: safe
+tags: [code, web]
+---
+id: code.docker-socket-mount
+engine: codecheck
+title: Docker socket mounted into a container
+severity: high
+cwe: CWE-250
+what: A compose file or manifest mounts /var/run/docker.sock.
+why: "Access to the Docker socket is root on the host: any container with it can start privileged containers."
+fix: Remove the mount and use a socket proxy with an allow-list of API calls if the container must talk to Docker.
+safety: safe
+tags: [code, containers]
+---
+id: code.allowed-hosts-wildcard
+engine: codecheck
+title: Django ALLOWED_HOSTS set to "*"
+severity: low
+cwe: CWE-16
+what: settings.py sets ALLOWED_HOSTS = ["*"].
+why: Host header validation is disabled, enabling password-reset poisoning and cache poisoning via a forged Host header.
+fix: List the real hostnames the site serves.
+safety: safe
+tags: [code, config]

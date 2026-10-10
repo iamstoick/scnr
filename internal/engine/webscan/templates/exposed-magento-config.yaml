@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-magento-config"
+info:
+  title: "Magento database configuration exposed"
+  severity: "critical"
+  cwe: "CWE-538"
+  what: "The file /app/etc/local.xml is publicly downloadable. Files of this kind hold credentials, keys or connection strings."
+  why: "Anyone on the internet can read the credentials inside and use them to log in to your database, cloud account or third-party services as you."
+  fix: "Remove the file from the web root immediately, rotate every credential it contains, and add a web-server rule that denies access to dotfiles and configuration files."
+  tags: ["exposure", "secrets", "magento"]
+safety: safe
+http:
+  - method: GET
+    path: ["/app/etc/local.xml", "/app/etc/env.php"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(<dbname>|<password>|\\'db\\'\\s*=>)"]

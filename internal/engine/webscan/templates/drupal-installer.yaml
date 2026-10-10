@@ -1,0 +1,22 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "drupal-installer"
+info:
+  title: "Drupal installer reachable"
+  severity: "medium"
+  cwe: "CWE-1188"
+  what: "An administrative or management interface is reachable at /install.php."
+  why: "Management consoles are high-value targets: default or weak credentials, or a missing login, give full control of the application or server."
+  fix: "Restrict the interface to trusted networks (VPN or allow-listed IPs), require strong authentication and MFA, and remove it if it is not needed."
+  tags: ["drupal", "admin"]
+safety: safe
+http:
+  - method: GET
+    path: ["/install.php", "/core/install.php"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        words: ["Drupal"]
+      - type: regex
+        regex: ["(Select an installation profile|Choose language|install\\.php)"]

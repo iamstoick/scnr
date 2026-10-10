@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-config-yaml"
+info:
+  title: "Configuration YAML with secret-like keys exposed"
+  severity: "high"
+  cwe: "CWE-538"
+  what: "The configuration file /config.yml is served to anyone who asks for it."
+  why: "Configuration files reveal internal hostnames, settings and sometimes credentials, which makes targeted attacks much easier."
+  fix: "Move configuration out of the web root or deny access to it in the web server, then check whether it contained any secret that must be rotated."
+  tags: ["exposure", "secrets"]
+safety: safe
+http:
+  - method: GET
+    path: ["/config.yml", "/config.yaml", "/config/config.yml", "/secrets.yml", "/secrets.yaml"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(?im)^\\s*(password|secret|token|api_?key|private_?key)\\s*:"]

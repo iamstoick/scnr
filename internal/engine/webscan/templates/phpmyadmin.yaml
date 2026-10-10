@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "phpmyadmin"
+info:
+  title: "phpMyAdmin interface exposed"
+  severity: "medium"
+  cwe: "CWE-284"
+  what: "An administrative or management interface is reachable at /phpmyadmin/."
+  why: "Management consoles are high-value targets: default or weak credentials, or a missing login, give full control of the application or server."
+  fix: "Restrict the interface to trusted networks (VPN or allow-listed IPs), require strong authentication and MFA, and remove it if it is not needed."
+  tags: ["admin", "database"]
+safety: safe
+http:
+  - method: GET
+    path: ["/phpmyadmin/", "/phpMyAdmin/", "/pma/", "/mysql/", "/db/"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        words: ["phpMyAdmin"]

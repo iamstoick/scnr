@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "wp-xmlrpc"
+info:
+  title: "WordPress XML-RPC endpoint enabled"
+  severity: "low"
+  cwe: "CWE-400"
+  what: "The file /xmlrpc.php is present and public."
+  why: "This is informational: it is normal for many sites but worth knowing about."
+  fix: "Review the contents and make sure nothing sensitive is listed."
+  tags: ["wordpress"]
+safety: safe
+http:
+  - method: GET
+    path: ["/xmlrpc.php"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200, 405]
+      - type: word
+        words: ["XML-RPC server accepts POST requests only"]

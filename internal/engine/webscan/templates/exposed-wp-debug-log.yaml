@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-wp-debug-log"
+info:
+  title: "WordPress debug.log exposed"
+  severity: "high"
+  cwe: "CWE-532"
+  what: "A backup or dump file at /wp-content/debug.log is downloadable."
+  why: "Backups contain your database contents or source code, often including user data and credentials."
+  fix: "Delete the file from the web root, store backups outside it with restricted permissions, and rotate any credentials inside."
+  tags: ["exposure", "logs", "wordpress"]
+safety: safe
+http:
+  - method: GET
+    path: ["/wp-content/debug.log"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["PHP (Notice|Warning|Fatal error|Deprecated)"]

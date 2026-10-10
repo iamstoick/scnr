@@ -1,0 +1,64 @@
+{
+  "version": "1.100.0",
+  "results": [
+    {
+      "check_id": "python.lang.security.audit.dangerous-subprocess-use.dangerous-subprocess-use",
+      "path": "/repo/root/app/run.py",
+      "start": {"line": 12, "col": 5, "offset": 230},
+      "end": {"line": 12, "col": 48, "offset": 273},
+      "extra": {
+        "message": "Detected subprocess function 'call' with shell=True.",
+        "metadata": {
+          "cwe": ["CWE-78: Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')"],
+          "references": ["https://docs.python.org/3/library/subprocess.html", "ftp://not-allowed.example/x"],
+          "category": "security",
+          "confidence": "MEDIUM"
+        },
+        "severity": "ERROR",
+        "lines": "    subprocess.call(\"ls \" + user_input, shell=True)",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "../../etc/passwd",
+      "path": "app/run.py",
+      "start": {"line": 1},
+      "extra": {"message": "hostile check id", "severity": "ERROR", "metadata": {}}
+    },
+    {
+      "check_id": "rules.escape-attempt",
+      "path": "../../../etc/shadow",
+      "start": {"line": 1},
+      "extra": {"message": "hostile path", "severity": "ERROR", "metadata": {}}
+    },
+    "not-an-object",
+    {
+      "check_id": "rules.bad-severity",
+      "path": "app/x.py",
+      "start": {"line": 2},
+      "extra": {"message": "unknown severity word", "severity": "APOCALYPTIC", "metadata": {}}
+    },
+    {
+      "check_id": "javascript.express.security.audit.express-cookie-session-no-secure.express-cookie-session-no-secure",
+      "path": "web/server.js",
+      "start": {"line": 40, "col": 1, "offset": 900},
+      "end": {"line": 44, "col": 3, "offset": 1010},
+      "extra": {
+        "message": "Session cookie is missing the 'secure' flag. <script>alert(1)</script>\u0007\u0000",
+        "metadata": {
+          "cwe": "CWE-614: Sensitive Cookie in HTTPS Session Without 'Secure' Attribute",
+          "references": "https://expressjs.com/en/advanced/best-practice-security.html",
+          "category": "security",
+          "confidence": "HIGH"
+        },
+        "severity": "WARNING",
+        "lines": "app.use(session({ secret: \"s3cr3t-session-key-value\", cookie: { secure: false } }))\nconst token = \"ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij\"",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "errors": [{"code": 2, "level": "warn", "type": "Timeout", "message": "Timeout when running rule on web/big.js"}],
+  "paths": {"scanned": ["app/run.py", "web/server.js"]},
+  "skipped_rules": []
+}

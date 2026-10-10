@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "default-page-nginx"
+info:
+  title: "nginx default welcome page"
+  severity: "info"
+  cwe: "CWE-1188"
+  what: "The default placeholder page of the web server or framework is served at /."
+  why: "It usually means an unconfigured or forgotten server that nobody is patching. Informational."
+  fix: "Remove or replace the default site and decommission servers that are no longer needed."
+  tags: ["default"]
+safety: safe
+http:
+  - method: GET
+    path: ["/"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        words: ["Welcome to nginx!"]

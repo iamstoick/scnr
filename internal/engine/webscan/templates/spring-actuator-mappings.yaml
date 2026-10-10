@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "spring-actuator-mappings"
+info:
+  title: "Spring Boot actuator /mappings or /beans exposed"
+  severity: "medium"
+  cwe: "CWE-200"
+  what: "A debugging or diagnostics endpoint is enabled at /actuator/mappings."
+  why: "Debug endpoints leak configuration, environment variables, request data and sometimes allow code execution."
+  fix: "Disable debug and profiler features in production and restrict any remaining diagnostics endpoints to internal networks."
+  tags: ["debug", "spring"]
+safety: safe
+http:
+  - method: GET
+    path: ["/actuator/mappings", "/actuator/beans", "/mappings", "/beans"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["\"(dispatcherServlets|beans|contexts)\""]

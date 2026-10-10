@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-rails-master-key"
+info:
+  title: "Rails master key exposed"
+  severity: "critical"
+  cwe: "CWE-538"
+  what: "The file /config/master.key is publicly downloadable. Files of this kind hold credentials, keys or connection strings."
+  why: "Anyone on the internet can read the credentials inside and use them to log in to your database, cloud account or third-party services as you."
+  fix: "Remove the file from the web root immediately, rotate every credential it contains, and add a web-server rule that denies access to dotfiles and configuration files."
+  tags: ["exposure", "secrets", "rails"]
+safety: safe
+http:
+  - method: GET
+    path: ["/config/master.key"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["^[a-f0-9]{32}\\s*$"]

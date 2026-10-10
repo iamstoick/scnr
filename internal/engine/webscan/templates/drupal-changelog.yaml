@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "drupal-changelog"
+info:
+  title: "Drupal CHANGELOG.txt discloses version"
+  severity: "low"
+  cwe: "CWE-200"
+  what: "The file /CHANGELOG.txt discloses software names and versions."
+  why: "Exact versions let an attacker pick known exploits instead of guessing. Low impact on its own."
+  fix: "Remove the file or block access to it in the web server."
+  tags: ["drupal", "disclosure"]
+safety: safe
+http:
+  - method: GET
+    path: ["/CHANGELOG.txt", "/core/CHANGELOG.txt"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["Drupal \\d+\\.\\d+"]

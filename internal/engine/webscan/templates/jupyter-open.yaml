@@ -1,0 +1,23 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "jupyter-open"
+info:
+  title: "Jupyter notebook server reachable without a token"
+  severity: "high"
+  cwe: "CWE-306"
+  what: "A back-end service's HTTP interface is reachable at /tree without authentication."
+  why: "Databases, caches, orchestration and registry services exposed to the web can be read, modified or used to pivot into the infrastructure."
+  fix: "Bind the service to a private interface, require authentication, and put it behind a firewall or VPN."
+  tags: ["service", "python"]
+safety: safe
+http:
+  - method: GET
+    path: ["/tree", "/lab", "/api/contents"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(Jupyter|\"content\"\\s*:)"]
+      - type: regex
+        regex: ["(Password or token|login_submit|/login)"]
+        negative: true

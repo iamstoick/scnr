@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-ds-store"
+info:
+  title: "macOS .DS_Store file exposed"
+  severity: "low"
+  cwe: "CWE-538"
+  what: "The file /.DS_Store is present and public."
+  why: "This is informational: it is normal for many sites but worth knowing about."
+  fix: "Review the contents and make sure nothing sensitive is listed."
+  tags: ["exposure"]
+safety: safe
+http:
+  - method: GET
+    path: ["/.DS_Store"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        words: ["Bud1"]

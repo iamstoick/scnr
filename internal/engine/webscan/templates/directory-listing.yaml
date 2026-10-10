@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "directory-listing"
+info:
+  title: "Directory listing enabled"
+  severity: "medium"
+  cwe: "CWE-548"
+  what: "The web server lists the contents of the directory /."
+  why: "Directory listings expose files that were never meant to be found, such as backups, uploads and configuration."
+  fix: "Disable automatic indexes (Apache: Options -Indexes; nginx: autoindex off) and add an index file to directories that must stay public."
+  tags: ["exposure", "listing"]
+safety: safe
+http:
+  - method: GET
+    path: ["/", "/images/", "/img/", "/uploads/", "/static/", "/assets/", "/backup/", "/backups/", "/files/", "/download/", "/downloads/", "/tmp/", "/logs/", "/includes/", "/css/", "/js/"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(?i)(<title>Index of /|<h1>Index of /|Directory listing for /|Parent Directory</a>)"]

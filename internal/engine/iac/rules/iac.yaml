@@ -1,0 +1,328 @@
+id: iac.docker.no-user
+engine: iac
+title: Container runs as root (no USER instruction)
+severity: medium
+cwe: CWE-250
+what: The final stage of this Dockerfile never switches to a non-root user, so every process in the container starts as root.
+why: A root process that is compromised through an application bug can modify the container filesystem, read secrets mounted for other users and has a shorter path to container-escape vulnerabilities.
+fix: Create a user in the image (`RUN adduser -D app`) and add `USER app` after the installation steps.
+safety: safe
+tags: [iac, dockerfile]
+---
+id: iac.docker.add-url
+engine: iac
+title: ADD fetches a remote URL at build time
+severity: medium
+cwe: CWE-494
+what: An ADD instruction downloads from an http(s) URL during the build; the content is not checksummed by Docker.
+why: Whoever controls the URL (or the network path, for http) controls what ends up in the image on the next build.
+fix: Use `RUN curl -fsSL <url> -o file && echo "<sha256>  file" | sha256sum -c` (or `ADD --checksum=sha256:... <url>` on BuildKit) and COPY vetted artefacts instead.
+safety: safe
+tags: [iac, dockerfile]
+---
+id: iac.docker.latest-tag
+engine: iac
+title: Base image without a pinned tag
+severity: low
+cwe: CWE-1104
+what: A FROM instruction uses `latest` or no tag at all, so the base image changes whenever the upstream publisher pushes.
+why: Unpinned bases make builds non-reproducible and can silently pull in a vulnerable or incompatible base.
+fix: Pin a specific tag (`FROM alpine:3.20`) or better a digest (`FROM alpine@sha256:...`) and update it deliberately.
+safety: safe
+tags: [iac, dockerfile]
+---
+id: iac.docker.secret-in-env
+engine: iac
+title: Credential baked into the image via ENV or ARG
+severity: high
+cwe: CWE-798
+what: An ENV or ARG instruction assigns a literal value to a key that looks like a credential. ENV values persist in every layer and in `docker inspect`; ARG values remain in the image history.
+why: Anyone who can pull the image (or read the registry) can read the credential.
+fix: Pass secrets at run time (environment from a secret store, mounted files) or use BuildKit `--mount=type=secret` for build-time needs; rotate the exposed value.
+safety: safe
+tags: [iac, dockerfile, secrets]
+---
+id: iac.k8s.privileged
+engine: iac
+title: Privileged container
+severity: high
+cwe: CWE-250
+what: "A container sets `securityContext.privileged: true`, giving it every capability and access to host devices."
+why: A privileged container is effectively root on the node; a compromise of the application is a compromise of the host.
+fix: "Remove `privileged: true`; grant only the specific capabilities needed via `capabilities.add` and prefer `allowPrivilegeEscalation: false`."
+safety: safe
+tags: [iac, kubernetes]
+---
+id: iac.k8s.host-namespace
+engine: iac
+title: Pod shares a host namespace (hostNetwork, hostPID or hostIPC)
+severity: medium
+cwe: CWE-668
+what: The pod spec enables hostNetwork, hostPID or hostIPC, so the containers see the node's network interfaces, processes or IPC objects.
+why: Host namespaces bypass network policies and let a container observe or signal processes outside its own sandbox.
+fix: Set the flag to false; use a Service or hostPort for the specific traffic that needs node access.
+safety: safe
+tags: [iac, kubernetes]
+---
+id: iac.k8s.no-resource-limits
+engine: iac
+title: Container without CPU/memory limits
+severity: low
+cwe: CWE-770
+what: A container defines no `resources.limits` for memory or CPU.
+why: One runaway or attacked container can exhaust the node and evict its neighbours; limits also drive scheduling and quota enforcement.
+fix: Add `resources.limits.memory` and `resources.limits.cpu` (and matching requests) to every container.
+safety: safe
+tags: [iac, kubernetes]
+---
+id: iac.k8s.run-as-root
+engine: iac
+title: Container may run as root (runAsNonRoot not set)
+severity: medium
+cwe: CWE-250
+what: "Neither the pod nor the container securityContext sets `runAsNonRoot: true` or a non-zero `runAsUser`, so the image's default user (often root) is used."
+why: Root inside the container widens the blast radius of any application compromise and is a precondition for most container escapes.
+fix: "Set `securityContext.runAsNonRoot: true` (and a `runAsUser` the image supports) at pod or container level."
+safety: safe
+tags: [iac, kubernetes]
+---
+id: iac.k8s.secret-in-env
+engine: iac
+title: Credential as a literal environment value in the manifest
+severity: high
+cwe: CWE-798
+what: A container env entry whose name looks like a credential has a literal `value` instead of a `valueFrom.secretKeyRef`.
+why: Manifests are committed to version control and visible to anyone with read access to the namespace; the credential is exposed in both places.
+fix: Move the value into a Kubernetes Secret and reference it with `valueFrom.secretKeyRef`; rotate the exposed value.
+safety: safe
+tags: [iac, kubernetes, secrets]
+---
+id: iac.tf.s3-public-acl
+engine: iac
+title: S3 bucket with a public ACL
+severity: high
+cwe: CWE-284
+what: An aws_s3_bucket or aws_s3_bucket_acl sets a public-read or public-read-write canned ACL.
+why: Public ACLs expose every object in the bucket to the internet; this is the root cause of most reported cloud data leaks.
+fix: Set `acl = "private"`, enable an aws_s3_bucket_public_access_block, and serve public content through CloudFront with an origin access control instead.
+safety: safe
+tags: [iac, terraform, aws, s3]
+---
+id: iac.tf.s3-no-public-access-block
+engine: iac
+title: S3 bucket without a public access block
+severity: medium
+cwe: CWE-284
+what: An aws_s3_bucket has no matching aws_s3_bucket_public_access_block resource, so a later ACL or policy change can make it public.
+why: The public access block is the guard rail that turns an accidental public policy into an error instead of a leak.
+fix: Add `resource "aws_s3_bucket_public_access_block"` for the bucket with all four flags set to true.
+safety: safe
+tags: [iac, terraform, aws, s3]
+---
+id: iac.tf.s3-no-encryption
+engine: iac
+title: S3 bucket without server-side encryption configuration
+severity: low
+cwe: CWE-311
+what: An aws_s3_bucket has neither an inline server_side_encryption_configuration block nor an aws_s3_bucket_server_side_encryption_configuration resource.
+why: AWS now encrypts new objects with SSE-S3 by default, but an explicit configuration (and KMS where required) is what compliance frameworks check and what lets you enforce a key policy.
+fix: Add an aws_s3_bucket_server_side_encryption_configuration with `sse_algorithm = "aws:kms"` (or "AES256").
+safety: safe
+tags: [iac, terraform, aws, s3]
+---
+id: iac.tf.s3-no-versioning
+engine: iac
+title: S3 bucket without versioning
+severity: low
+cwe: CWE-693
+what: An aws_s3_bucket has no versioning enabled, inline or via aws_s3_bucket_versioning.
+why: Without versioning, a deletion or overwrite by an attacker or a bug is unrecoverable.
+fix: Add `resource "aws_s3_bucket_versioning"` with `status = "Enabled"` and a lifecycle rule to expire old versions.
+safety: safe
+tags: [iac, terraform, aws, s3]
+---
+id: iac.tf.s3-no-logging
+engine: iac
+title: S3 bucket without access logging
+severity: info
+cwe: CWE-778
+what: An aws_s3_bucket has no logging configuration, inline or via aws_s3_bucket_logging.
+why: Without access logs you cannot tell what was read after an incident.
+fix: Add `resource "aws_s3_bucket_logging"` pointing at a dedicated log bucket.
+safety: safe
+tags: [iac, terraform, aws, s3]
+---
+id: iac.tf.sg-open-ssh
+engine: iac
+title: Security group allows SSH (22) from anywhere
+severity: high
+cwe: CWE-284
+what: An ingress rule permits TCP port 22 from 0.0.0.0/0 or ::/0.
+why: Internet-exposed SSH is brute-forced within minutes of appearing and is the entry point for most compromised cloud instances.
+fix: Restrict the source to your VPN/bastion CIDR, or remove the rule and use SSM Session Manager.
+safety: safe
+tags: [iac, terraform, aws, network]
+---
+id: iac.tf.sg-open-rdp
+engine: iac
+title: Security group allows RDP (3389) from anywhere
+severity: high
+cwe: CWE-284
+what: An ingress rule permits TCP port 3389 from 0.0.0.0/0 or ::/0.
+why: Exposed RDP is a primary ransomware entry vector.
+fix: Restrict the source CIDR or use a bastion/VPN; never expose RDP directly.
+safety: safe
+tags: [iac, terraform, aws, network]
+---
+id: iac.tf.sg-open-all
+engine: iac
+title: Security group allows all ports from anywhere
+severity: critical
+cwe: CWE-284
+what: An ingress rule permits every port (from_port 0 to to_port 0/65535 or protocol "-1") from 0.0.0.0/0 or ::/0.
+why: Every service on the instance is reachable from the internet, including those never meant to be exposed.
+fix: Replace with rules naming the specific ports and sources each service needs.
+safety: safe
+tags: [iac, terraform, aws, network]
+---
+id: iac.tf.rds-public
+engine: iac
+title: RDS instance is publicly accessible
+severity: high
+cwe: CWE-284
+what: An aws_db_instance (or cluster instance) sets `publicly_accessible = true`.
+why: The database gets a public IP and is reachable from the internet, limited only by its security group and password.
+fix: Set `publicly_accessible = false` and reach the database through the VPC (bastion, VPN or application tier).
+safety: safe
+tags: [iac, terraform, aws, rds]
+---
+id: iac.tf.rds-unencrypted
+engine: iac
+title: RDS storage not encrypted
+severity: medium
+cwe: CWE-311
+what: An aws_db_instance or aws_rds_cluster does not set `storage_encrypted = true`.
+why: Snapshots and underlying volumes of an unencrypted database can be read by anyone who obtains them; encryption cannot be enabled on an existing instance without recreating it.
+fix: Set `storage_encrypted = true` (optionally `kms_key_id`) before the first apply.
+safety: safe
+tags: [iac, terraform, aws, rds]
+---
+id: iac.tf.rds-no-backups
+engine: iac
+title: RDS instance with automated backups disabled
+severity: low
+cwe: CWE-693
+what: An aws_db_instance sets `backup_retention_period = 0`.
+why: Without automated backups a destructive incident (ransomware, bad migration) has no recovery point.
+fix: Set `backup_retention_period` to at least 7 days.
+safety: safe
+tags: [iac, terraform, aws, rds]
+---
+id: iac.tf.ebs-unencrypted
+engine: iac
+title: EBS volume not encrypted
+severity: medium
+cwe: CWE-311
+what: An aws_ebs_volume, or an aws_instance root/ebs block device, does not set `encrypted = true`.
+why: Unencrypted volumes and their snapshots can be attached or copied by anyone with the right IAM permissions and read offline.
+fix: Set `encrypted = true` on the volume/block device, and enable EBS encryption by default for the account.
+safety: safe
+tags: [iac, terraform, aws, ec2]
+---
+id: iac.tf.iam-wildcard-action
+engine: iac
+title: IAM policy allows all actions ("*")
+severity: high
+cwe: CWE-269
+what: An IAM policy document has an Allow statement whose Action is "*" (or "service:*" on all resources).
+why: Wildcard actions turn any principal holding the policy into an administrator; least privilege is the single most effective cloud control.
+fix: List the specific actions the workload needs; use IAM Access Analyzer's policy generation from CloudTrail to derive them.
+safety: safe
+tags: [iac, terraform, aws, iam]
+---
+id: iac.tf.cloudtrail-logging-disabled
+engine: iac
+title: CloudTrail with logging disabled
+severity: high
+cwe: CWE-778
+what: An aws_cloudtrail sets `enable_logging = false`.
+why: Without CloudTrail there is no record of API activity in the account; incident response is blind.
+fix: Set `enable_logging = true`.
+safety: safe
+tags: [iac, terraform, aws, cloudtrail]
+---
+id: iac.tf.cloudtrail-not-multi-region
+engine: iac
+title: CloudTrail is not multi-region
+severity: medium
+cwe: CWE-778
+what: An aws_cloudtrail does not set `is_multi_region_trail = true`.
+why: Attackers operate in regions you do not use; a single-region trail misses them.
+fix: Set `is_multi_region_trail = true` and `include_global_service_events = true`.
+safety: safe
+tags: [iac, terraform, aws, cloudtrail]
+---
+id: iac.tf.cloudtrail-no-validation
+engine: iac
+title: CloudTrail log file validation disabled
+severity: low
+cwe: CWE-354
+what: An aws_cloudtrail does not set `enable_log_file_validation = true`.
+why: Without digest files, tampering with delivered logs cannot be detected.
+fix: Set `enable_log_file_validation = true`.
+safety: safe
+tags: [iac, terraform, aws, cloudtrail]
+---
+id: iac.tf.kms-rotation-disabled
+engine: iac
+title: KMS key without automatic rotation
+severity: low
+cwe: CWE-324
+what: An aws_kms_key does not set `enable_key_rotation = true`.
+why: Long-lived key material increases the impact of a key compromise and fails most compliance baselines.
+fix: Set `enable_key_rotation = true` for symmetric keys.
+safety: safe
+tags: [iac, terraform, aws, kms]
+---
+id: iac.tf.secret-in-variable-default
+engine: iac
+title: Credential in a Terraform variable default
+severity: high
+cwe: CWE-798
+what: A `variable` block whose name looks like a credential has a literal default value.
+why: Defaults live in version control and in every plan output; the credential is effectively published to the repo.
+fix: Remove the default, mark the variable `sensitive = true`, and supply the value from a secret store or TF_VAR environment variable at apply time; rotate the exposed value.
+safety: safe
+tags: [iac, terraform, secrets]
+---
+id: iac.tf.instance-public-ip
+engine: iac
+title: EC2 instance with a public IP
+severity: low
+cwe: CWE-668
+what: An aws_instance or aws_launch_template sets `associate_public_ip_address = true`.
+why: Instances with public IPs are directly reachable from the internet and are the first thing scanners find.
+fix: Place instances in private subnets behind a load balancer or NAT gateway; set `associate_public_ip_address = false`.
+safety: safe
+tags: [iac, terraform, aws, ec2]
+---
+id: iac.tf.lambda-secret-in-env
+engine: iac
+title: Credential in Lambda environment variables
+severity: high
+cwe: CWE-798
+what: An aws_lambda_function environment variable whose name looks like a credential has a literal value.
+why: Lambda environment variables are visible to anyone with `lambda:GetFunctionConfiguration` and appear in the console and in Terraform state.
+fix: Store the value in Secrets Manager or SSM Parameter Store and read it at runtime; rotate the exposed value.
+safety: safe
+tags: [iac, terraform, aws, lambda, secrets]
+---
+id: iac.file-skipped-too-complex
+engine: iac
+title: "IaC file(s) skipped: nesting deeper than the parser allows"
+severity: info
+what: One or more Terraform or Kubernetes files nest brackets, braces or YAML collections deeper than 100 levels, so scnr did not parse them. Recursive parsers overflow the process stack on such input, which cannot be caught, so the depth is measured on the raw bytes first.
+why: Rules were not evaluated for the skipped files, so any misconfiguration or credential in them is missing from this report. Real configuration rarely nests beyond a dozen levels; a file this deep is either generated or crafted.
+fix: Review the listed files by hand or split them; if they are legitimate, reduce the nesting (extract modules or values) and re-run.
+safety: safe
+tags: [iac, coverage]

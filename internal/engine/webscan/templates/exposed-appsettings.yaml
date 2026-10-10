@@ -1,0 +1,21 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-appsettings"
+info:
+  title: "ASP.NET appsettings with connection strings exposed"
+  severity: "high"
+  cwe: "CWE-538"
+  what: "The file /appsettings.json is publicly downloadable. Files of this kind hold credentials, keys or connection strings."
+  why: "Anyone on the internet can read the credentials inside and use them to log in to your database, cloud account or third-party services as you."
+  fix: "Remove the file from the web root immediately, rotate every credential it contains, and add a web-server rule that denies access to dotfiles and configuration files."
+  tags: ["exposure", "secrets", "dotnet"]
+safety: safe
+http:
+  - method: GET
+    path: ["/appsettings.json", "/appsettings.Development.json", "/appsettings.Production.json"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        words: ["ConnectionStrings"]
+        case-insensitive: true

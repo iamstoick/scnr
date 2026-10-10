@@ -1,0 +1,21 @@
+id: sca.vulnerable-dependency
+engine: sca
+title: Dependency with a known vulnerability
+severity: medium
+cwe: CWE-1395
+what: A third-party package pinned in a lockfile has a published vulnerability (from the OSV database) affecting the installed version.
+why: Attackers scan for applications using known-vulnerable library versions because the exploit is already public. The fix is usually a version bump.
+fix: Upgrade the package to a fixed version and re-run the scan.
+references: ["https://osv.dev"]
+safety: safe
+tags: [sca, dependencies]
+---
+id: sca.lookup-truncated
+engine: sca
+title: Too many packages; vulnerability lookup was truncated
+severity: info
+what: More packages were collected from lockfiles and package databases than scnr sends to OSV in one scan (200,000). The first 200,000 were checked; the rest were not.
+why: Vulnerabilities in the packages past the cap are missing from this report. A tree with this many distinct package versions is either a monorepo of vendored lockfiles or a crafted input.
+fix: Scan sub-directories separately, exclude generated or vendored lockfiles with .gitignore, or scan a slimmer image.
+safety: safe
+tags: [sca, coverage]

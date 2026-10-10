@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-trace-axd"
+info:
+  title: "ASP.NET trace viewer exposed"
+  severity: "high"
+  cwe: "CWE-532"
+  what: "A debugging or diagnostics endpoint is enabled at /trace.axd."
+  why: "Debug endpoints leak configuration, environment variables, request data and sometimes allow code execution."
+  fix: "Disable debug and profiler features in production and restrict any remaining diagnostics endpoints to internal networks."
+  tags: ["debug", "dotnet"]
+safety: safe
+http:
+  - method: GET
+    path: ["/trace.axd"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        words: ["Application Trace"]

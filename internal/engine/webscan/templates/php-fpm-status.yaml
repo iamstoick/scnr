@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "php-fpm-status"
+info:
+  title: "PHP-FPM status page exposed"
+  severity: "low"
+  cwe: "CWE-200"
+  what: "A server status or metrics page is public at /fpm-status."
+  why: "It discloses internal addresses, request paths and load information that help an attacker map the system."
+  fix: "Restrict the status endpoint to localhost or monitoring hosts only."
+  tags: ["status", "php"]
+safety: safe
+http:
+  - method: GET
+    path: ["/fpm-status", "/php-fpm-status", "/php_fpm_status", "/status.php"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(?m)^pool:\\s+\\w+"]

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>scnr report {{.Scan.ID | short}}</title>
+<style>{{.CSS}}</style>
+</head>
+<body>
+<header>
+  <h1>scnr security report</h1>
+  <p class="muted">Scan <code>{{.Scan.ID}}</code> &middot; profile {{.Scan.Profile}} &middot; {{.Scan.StartedAt.Format "2006-01-02 15:04 UTC"}} &middot; targets: {{.TargetSummary}}</p>
+</header>
+
+<section class="scorecard grade-{{.Grade}}">
+  <div class="score">
+    <div class="num">{{.Score}}<span class="of">/100</span></div>
+    <div class="grade">Grade {{.Grade}}{{if .Partial}} <span class="partial">(partial)</span>{{end}}</div>
+    {{if .DeltaText}}<div class="delta">{{.DeltaText}}</div>{{end}}
+  </div>
+  <ul class="counts">
+    <li class="b-critical"><b>{{index .Counts "critical"}}</b> critical</li>
+    <li class="b-high"><b>{{index .Counts "high"}}</b> high</li>
+    <li class="b-medium"><b>{{index .Counts "medium"}}</b> medium</li>
+    <li class="b-low"><b>{{index .Counts "low"}}</b> low</li>
+    <li class="b-info"><b>{{index .Counts "info"}}</b> info</li>
+  </ul>
+  {{if .KEVOpen}}<p class="warn">An open finding is on CISA's Known Exploited Vulnerabilities list; the grade is capped at D until it is fixed.</p>{{end}}
+  {{if .Partial}}<p class="warn">Some engines did not run or failed; see Coverage below. The score only reflects what ran.</p>{{end}}
+  {{if not .ExploitData}}<p class="muted">Exploit data unavailable (KEV/EPSS not loaded); run <code>scnr db update</code> for exploit-aware scoring.</p>{{end}}
+</section>
+
+<section>
+  <h2>Fix these first</h2>
+  {{if .TopFixes}}
+  <ol class="fixes">
+    {{range .TopFixes}}
+    <li class="b-{{bucket .Risk}}">
+      <div class="fix-head"><span class="risk">{{.Risk}}</span> <strong>{{.Title}}</strong> <span class="muted">{{.AssetKey}}{{if .Location}} &middot; {{.Location}}{{end}}</span></div>
+      <div class="fix-body">{{.HowToFix}}</div>
+    </li>
+    {{end}}
+  </ol>
+  {{else}}<p>No open findings with a fix. Nice.</p>{{end}}
+</section>
+
+<section>
+  <h2>Findings ({{.Total}}){{if .Truncated}} <span class="muted">showing the top {{len .Assets}} assets' highest-risk findings; see report.json for all</span>{{end}}</h2>
+  {{range .Assets}}
+  <details open class="asset">
+    <summary><strong>{{.Key}}</strong> <span class="muted">{{len .Findings}} finding(s), max risk {{.MaxRisk}}</span></summary>
+    {{range .Findings}}
+    <article class="finding b-{{bucket .Risk}}">
+      <h3><span class="risk">{{.Risk}}</span> {{.Title}}</h3>
+      <p class="meta">
+        <span>rule <code>{{.RuleID}}</code></span>
+        <span>engine {{.Engine}}</span>
+        <span>severity {{sevName .Severity}}</span>
+        <span>confidence {{confName .Confidence}}</span>
+        {{if .CWE}}<span>{{.CWE}}</span>{{end}}
+        {{if .CVSS}}<span>CVSS {{printf "%.1f" .CVSS.Score}}</span>{{end}}
+        {{if .EPSS}}<span>EPSS {{printf "%.3f" .EPSS}}</span>{{end}}
+        {{if .KEV}}<span class="kev">KEV</span>{{end}}
+        {{if .Location}}<span>at <code>{{.Location}}</code></span>{{end}}
+      </p>
+      <dl>
+        <dt>What it is</dt><dd>{{.WhatItIs}}</dd>
+        <dt>Why it matters</dt><dd>{{.WhyItMatters}}</dd>
+        <dt>How to fix</dt><dd>{{.HowToFix}}</dd>
+        {{if eq (confName .Confidence) "tentative"}}<dt>Note</dt><dd>Pattern match; verify in context before acting.</dd>{{end}}
+      </dl>
+      {{if .Evidence}}
+      <div class="evidence">
+        <div class="muted">Evidence (redacted)</div>
+        {{range .Evidence}}<pre>[{{.Kind}}] {{.Location}}
+{{.Redacted}}</pre>{{end}}
+      </div>
+      {{end}}
+      {{if .CVEs}}<p class="muted">CVEs: {{join .CVEs ", "}}</p>{{end}}
+      {{if .References}}<p class="muted">References: {{range .References}}<a href="{{.}}" rel="noopener noreferrer">{{.}}</a> {{end}}</p>{{end}}
+    </article>
+    {{end}}
+  </details>
+  {{else}}<p>No findings.</p>{{end}}
+</section>
+
+{{if .Suppressed}}
+<section>
+  <h2>Accepted / suppressed ({{len .Suppressed}})</h2>
+  <table>
+    <tr><th>Status</th><th>Risk</th><th>Title</th><th>Asset</th><th>Location</th></tr>
+    {{range .Suppressed}}<tr><td>{{.Status}}</td><td>{{.Risk}}</td><td>{{.Title}}</td><td>{{.AssetKey}}</td><td>{{.Location}}</td></tr>{{end}}
+  </table>
+</section>
+{{end}}
+
+<section>
+  <h2>Coverage</h2>
+  <table>
+    <tr><th>Engine</th><th>Version</th><th>Status</th><th>Duration</th><th>Error</th></tr>
+    {{range .Scan.Engines}}<tr><td>{{.Name}}</td><td>{{.Version}}</td><td>{{.Status}}</td><td>{{dur .Duration}}</td><td>{{.Error}}</td></tr>{{end}}
+  </table>
+  <p class="muted">Engines marked "skipped" did not run (tool not installed, offline, or not applicable). Installing nmap or nuclei adds adapter coverage now; trivy, grype, semgrep and prowler arrive in later phases. Run <code>scnr doctor --install-guide</code>.</p>
+</section>
+
+<section>
+  <h2>Scan metadata</h2>
+  <table>
+    <tr><th>Consent method</th><td>{{.Scan.Consent.Method}} by {{.Scan.Consent.By}}</td></tr>
+    <tr><th>Scope hash</th><td><code>{{.Scan.ScopeHash}}</code></td></tr>
+    <tr><th>Target set hash</th><td><code>{{.Scan.TargetSetHash}}</code></td></tr>
+    <tr><th>Started</th><td>{{.Scan.StartedAt.Format "2006-01-02T15:04:05Z07:00"}}</td></tr>
+    <tr><th>Finished</th><td>{{.Scan.FinishedAt.Format "2006-01-02T15:04:05Z07:00"}}</td></tr>
+    <tr><th>Exit code</th><td>{{.Scan.ExitCode}}</td></tr>
+    <tr><th>Generated</th><td>{{.GeneratedAt}} by scnr {{.Version}}</td></tr>
+  </table>
+  <details><summary>How the score is computed</summary><pre>{{.Explain}}</pre></details>
+</section>
+<footer class="muted">scnr is a defensive discovery tool: it observes and reports, it never exploits. Secret evidence is shown masked (at most a few characters) with a keyed fingerprint; raw values are never stored.</footer>
+</body>
+</html>

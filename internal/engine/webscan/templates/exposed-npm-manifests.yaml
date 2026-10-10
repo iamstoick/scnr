@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-npm-manifests"
+info:
+  title: "npm package manifest or lock file exposed"
+  severity: "low"
+  cwe: "CWE-200"
+  what: "The dependency manifest /package.json is publicly readable."
+  why: "It lists the exact libraries and versions in use, letting an attacker look up known vulnerabilities for each. Low impact on its own."
+  fix: "Deny access to build and dependency files in the web server, or deploy only the built artefacts."
+  tags: ["exposure", "javascript"]
+safety: safe
+http:
+  - method: GET
+    path: ["/package.json", "/package-lock.json", "/yarn.lock", "/pnpm-lock.yaml"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(\"(dependencies|devDependencies|lockfileVersion)\"\\s*:|# yarn lockfile|lockfileVersion:)"]

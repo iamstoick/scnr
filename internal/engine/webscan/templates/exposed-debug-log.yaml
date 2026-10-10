@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-debug-log"
+info:
+  title: "Application log file exposed"
+  severity: "medium"
+  cwe: "CWE-532"
+  what: "A backup or dump file at /debug.log is downloadable."
+  why: "Backups contain your database contents or source code, often including user data and credentials."
+  fix: "Delete the file from the web root, store backups outside it with restricted permissions, and rotate any credentials inside."
+  tags: ["exposure", "logs"]
+safety: safe
+http:
+  - method: GET
+    path: ["/debug.log", "/error.log", "/error_log", "/logs/error.log", "/log/error.log", "/app.log"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(?i)(error|exception|warning|traceback|stack ?trace)"]

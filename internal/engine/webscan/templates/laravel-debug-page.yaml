@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "laravel-debug-page"
+info:
+  title: "Laravel debug mode enabled (error page shows internals)"
+  severity: "medium"
+  cwe: "CWE-489"
+  what: "A debugging or diagnostics endpoint is enabled at /."
+  why: "Debug endpoints leak configuration, environment variables, request data and sometimes allow code execution."
+  fix: "Disable debug and profiler features in production and restrict any remaining diagnostics endpoints to internal networks."
+  tags: ["debug", "laravel"]
+safety: safe
+http:
+  - method: GET
+    path: ["/"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [500]
+      - type: regex
+        regex: ["(Whoops, looks like something went wrong|Ignition|APP_DEBUG)"]

@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-go-mod"
+info:
+  title: "Go module file exposed"
+  severity: "low"
+  cwe: "CWE-200"
+  what: "The dependency manifest /go.mod is publicly readable."
+  why: "It lists the exact libraries and versions in use, letting an attacker look up known vulnerabilities for each. Low impact on its own."
+  fix: "Deny access to build and dependency files in the web server, or deploy only the built artefacts."
+  tags: ["exposure", "go"]
+safety: safe
+http:
+  - method: GET
+    path: ["/go.mod", "/go.sum"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(?m)^(module |[a-z0-9.\\-/]+ v\\d)"]

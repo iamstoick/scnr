@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-circleci-config"
+info:
+  title: "CircleCI configuration exposed"
+  severity: "low"
+  cwe: "CWE-200"
+  what: "The CI/CD configuration /.circleci/config.yml is publicly readable."
+  why: "It reveals build steps, internal service names and sometimes variable names that hint at secrets."
+  fix: "Exclude CI configuration from the deployed web root."
+  tags: ["exposure", "ci"]
+safety: safe
+http:
+  - method: GET
+    path: ["/.circleci/config.yml"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(?m)^(version|jobs|workflows):"]

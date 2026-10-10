@@ -1,0 +1,50 @@
+id: image.rpm-database-found
+engine: image
+title: RPM package database found; OS package results need trivy or grype
+severity: info
+what: The image is rpm-based (Red Hat, Fedora, SUSE, Amazon Linux). scnr's native image engine reads apk and dpkg databases only, so operating-system packages in this image were not checked.
+why: Known-vulnerable OS packages are the most common finding in container images; without an rpm reader this image's OS layer is a blind spot in the report.
+fix: Install trivy or grype (`scnr doctor --install-guide`) and re-run; their adapters read rpm databases and their findings merge into this report.
+safety: safe
+tags: [image, coverage]
+---
+id: image.too-large
+engine: image
+title: Image exceeds the size cap and was not fully scanned
+severity: low
+what: A layer or the whole image decompressed to more than the engine's cap (2 GiB per layer, 8 GiB per image), so the walk stopped early.
+why: Oversized or deliberately expanding layers (decompression bombs) cannot be inspected safely; packages added after the cap was hit were not checked.
+fix: Scan a slimmer image, or run trivy/grype (which stream to disk) via their adapters for this image.
+safety: safe
+tags: [image, coverage]
+---
+id: image.unsupported-layer
+engine: image
+title: Layer compression not supported by the native image engine
+severity: info
+what: The image uses zstd-compressed layers, which the native engine cannot stream; its OS and lockfile packages were not checked.
+why: Packages in unreadable layers are not in this report.
+fix: Re-export the image with gzip layers (`docker save` default) or run trivy/grype via their adapters.
+safety: safe
+tags: [image, coverage]
+---
+id: image.os-unknown
+engine: image
+title: Operating system could not be identified; OS packages not checked
+severity: info
+what: The image has an apk or dpkg package database but no readable /etc/os-release, or its distribution has no OSV feed, so its OS packages were listed but not looked up.
+why: Without the distribution and release there is no advisory feed to compare package versions against.
+fix: Use a base image that ships /etc/os-release (all official Alpine, Debian and Ubuntu images do) or run trivy/grype for this image.
+safety: safe
+tags: [image, coverage]
+---
+id: image.hostile-archive
+engine: image
+title: Image archive contains absolute or traversal paths
+severity: medium
+cwe: CWE-22
+what: One or more tar entries in the image archive have names starting with "/" or containing "..". scnr ignored them, but a container runtime or extraction tool that does not may write files outside the intended root.
+why: Path-traversal entries in an image are either a build-tool bug or a deliberately crafted archive; neither belongs in a trusted image.
+fix: Rebuild the image from a trusted Dockerfile and do not load archives from untrusted sources.
+safety: safe
+tags: [image, integrity]

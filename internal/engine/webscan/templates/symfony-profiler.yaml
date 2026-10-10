@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "symfony-profiler"
+info:
+  title: "Symfony profiler exposed"
+  severity: "high"
+  cwe: "CWE-489"
+  what: "A debugging or diagnostics endpoint is enabled at /_profiler/."
+  why: "Debug endpoints leak configuration, environment variables, request data and sometimes allow code execution."
+  fix: "Disable debug and profiler features in production and restrict any remaining diagnostics endpoints to internal networks."
+  tags: ["debug", "symfony"]
+safety: safe
+http:
+  - method: GET
+    path: ["/_profiler/", "/_profiler/latest", "/_profiler/empty/search/results"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(Symfony Profiler|sf-toolbar|_profiler)"]

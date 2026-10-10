@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "kubernetes-version"
+info:
+  title: "Kubernetes version endpoint exposed"
+  severity: "medium"
+  cwe: "CWE-200"
+  what: "A back-end service's HTTP interface is reachable at /version without authentication."
+  why: "Databases, caches, orchestration and registry services exposed to the web can be read, modified or used to pivot into the infrastructure."
+  fix: "Bind the service to a private interface, require authentication, and put it behind a firewall or VPN."
+  tags: ["service", "kubernetes"]
+safety: safe
+http:
+  - method: GET
+    path: ["/version"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["\"gitVersion\"\\s*:\\s*\"v\\d"]

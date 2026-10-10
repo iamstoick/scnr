@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-git-config"
+info:
+  title: "Git repository configuration exposed (.git/config)"
+  severity: "critical"
+  cwe: "CWE-538"
+  what: "Version-control metadata at /.git/config is exposed, which usually means the whole repository can be downloaded."
+  why: "Attackers reconstruct the full source code and history from exposed repositories, including deleted files and committed secrets."
+  fix: "Deny access to .git, .svn, .hg and similar directories in the web server (or deploy without them) and rotate any secret that was ever committed."
+  tags: ["exposure", "vcs", "git"]
+safety: safe
+http:
+  - method: GET
+    path: ["/.git/config"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        words: ["[core]"]

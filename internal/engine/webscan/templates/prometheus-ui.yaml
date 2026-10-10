@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "prometheus-ui"
+info:
+  title: "Prometheus web UI exposed"
+  severity: "medium"
+  cwe: "CWE-306"
+  what: "A back-end service's HTTP interface is reachable at /graph without authentication."
+  why: "Databases, caches, orchestration and registry services exposed to the web can be read, modified or used to pivot into the infrastructure."
+  fix: "Bind the service to a private interface, require authentication, and put it behind a firewall or VPN."
+  tags: ["service", "metrics"]
+safety: safe
+http:
+  - method: GET
+    path: ["/graph", "/targets", "/api/v1/status/buildinfo"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(Prometheus Time Series|<title>Prometheus|\"goVersion\")"]

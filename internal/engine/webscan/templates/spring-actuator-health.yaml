@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "spring-actuator-health"
+info:
+  title: "Spring Boot actuator health endpoint public"
+  severity: "info"
+  cwe: "CWE-200"
+  what: "The file /actuator/health is present and public."
+  why: "This is informational: it is normal for many sites but worth knowing about."
+  fix: "Review the contents and make sure nothing sensitive is listed."
+  tags: ["spring"]
+safety: safe
+http:
+  - method: GET
+    path: ["/actuator/health", "/health"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["\"status\"\\s*:\\s*\"(UP|DOWN)\""]

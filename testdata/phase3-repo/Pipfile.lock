@@ -1,0 +1,3 @@
+{"_meta": {"hash": {"sha256": "x"}, "pipfile-spec": 6, "requires": {}, "sources": []},
+ "default": {"jinja2": {"hashes": [], "index": "pypi", "version": "==2.11.2"}},
+ "develop": {"pytest": {"version": "==7.4.0"}}}

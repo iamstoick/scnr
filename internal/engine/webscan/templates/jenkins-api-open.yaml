@@ -1,0 +1,23 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "jenkins-api-open"
+info:
+  title: "Jenkins API reachable without login"
+  severity: "high"
+  cwe: "CWE-284"
+  what: "An administrative or management interface is reachable at /api/json."
+  why: "Management consoles are high-value targets: default or weak credentials, or a missing login, give full control of the application or server."
+  fix: "Restrict the interface to trusted networks (VPN or allow-listed IPs), require strong authentication and MFA, and remove it if it is not needed."
+  tags: ["admin", "jenkins"]
+safety: safe
+http:
+  - method: GET
+    path: ["/api/json"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        words: ["\"_class\""]
+      - type: word
+        words: ["hudson", "jenkins"]
+        case-insensitive: true

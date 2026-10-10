@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-travis-config"
+info:
+  title: ".travis.yml exposed"
+  severity: "low"
+  cwe: "CWE-200"
+  what: "The CI/CD configuration /.travis.yml is publicly readable."
+  why: "It reveals build steps, internal service names and sometimes variable names that hint at secrets."
+  fix: "Exclude CI configuration from the deployed web root."
+  tags: ["exposure", "ci"]
+safety: safe
+http:
+  - method: GET
+    path: ["/.travis.yml"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(?m)^(language|script|install):"]

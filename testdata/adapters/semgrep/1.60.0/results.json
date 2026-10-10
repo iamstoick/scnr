@@ -1,0 +1,61 @@
+{
+  "version": "1.60.0",
+  "results": [
+    {
+      "check_id": "python.lang.security.audit.dangerous-subprocess-use.dangerous-subprocess-use",
+      "path": "app/run.py",
+      "start": {"line": 12, "col": 5, "offset": 230},
+      "end": {"line": 12, "col": 48, "offset": 273},
+      "extra": {
+        "message": "Detected subprocess function 'call' with shell=True. This is dangerous because this call will spawn the command using a shell process.",
+        "metadata": {
+          "cwe": ["CWE-78: Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')"],
+          "owasp": ["A01:2017 - Injection"],
+          "references": ["https://docs.python.org/3/library/subprocess.html"],
+          "category": "security",
+          "confidence": "MEDIUM",
+          "likelihood": "MEDIUM",
+          "impact": "HIGH"
+        },
+        "severity": "ERROR",
+        "fingerprint": "abc123",
+        "lines": "    subprocess.call(\"ls \" + user_input, shell=True)",
+        "validation_state": "NO_VALIDATOR",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "javascript.express.security.audit.express-cookie-session-no-secure.express-cookie-session-no-secure",
+      "path": "web/server.js",
+      "start": {"line": 40, "col": 1, "offset": 900},
+      "end": {"line": 44, "col": 3, "offset": 1010},
+      "extra": {
+        "message": "Session cookie is missing the 'secure' flag.",
+        "metadata": {
+          "cwe": "CWE-614: Sensitive Cookie in HTTPS Session Without 'Secure' Attribute",
+          "references": ["https://expressjs.com/en/advanced/best-practice-security.html"],
+          "category": "security",
+          "confidence": "HIGH"
+        },
+        "severity": "WARNING",
+        "lines": "app.use(session({ secret: \"s3cr3t-session-key-value\", cookie: { secure: false } }))",
+        "engine_kind": "OSS"
+      }
+    },
+    {
+      "check_id": "generic.secrets.security.detected-aws-access-key-id-value.detected-aws-access-key-id-value",
+      "path": "config/settings.py",
+      "start": {"line": 3, "col": 18, "offset": 60},
+      "end": {"line": 3, "col": 38, "offset": 80},
+      "extra": {
+        "message": "AWS Access Key ID Value detected",
+        "metadata": {"cwe": ["CWE-798: Use of Hard-coded Credentials"], "category": "security", "confidence": "LOW"},
+        "severity": "INFO",
+        "lines": "AWS_ACCESS_KEY = \"AKIAIOSFODNN7EXAMPLE\"",
+        "engine_kind": "OSS"
+      }
+    }
+  ],
+  "errors": [],
+  "paths": {"scanned": ["app/run.py", "web/server.js", "config/settings.py"]}
+}

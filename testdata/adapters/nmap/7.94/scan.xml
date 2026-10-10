@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///opt/homebrew/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.94 scan initiated Fri Oct 10 09:05:00 2026 as: nmap -sT -sV -Pn -n -T3 -oX - -p 22,443,3389,6379,8080 10.0.0.5 10.0.0.6 -->
+<nmaprun scanner="nmap" args="nmap -sT -sV -Pn -n -T3 -oX - -p 22,443,3389,6379,8080 10.0.0.5 10.0.0.6" start="1791623100" startstr="Fri Oct 10 09:05:00 2026" version="7.94" xmloutputversion="1.05">
+<scaninfo type="connect" protocol="tcp" numservices="5" services="22,443,3389,6379,8080"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="10.0.0.5" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<host starttime="1791623100" endtime="1791623109"><status state="up" reason="user-set" reason_ttl="0"/>
+<address addr="10.0.0.5" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><port protocol="tcp" portid="22"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="ssh" product="OpenSSH" version="9.6p1 Ubuntu 3ubuntu13" extrainfo="Ubuntu Linux; protocol 2.0" ostype="Linux" method="probed" conf="10"><cpe>cpe:/a:openbsd:openssh:9.6p1</cpe><cpe>cpe:/o:linux:linux_kernel</cpe></service></port>
+<port protocol="tcp" portid="443"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="http" product="nginx" version="1.24.0" tunnel="ssl" method="probed" conf="10"><cpe>cpe:/a:f5:nginx:1.24.0</cpe></service></port>
+<port protocol="tcp" portid="3389"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="ms-wbt-server" method="table" conf="3"/></port>
+<port protocol="tcp" portid="6379"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="redis" product="Redis key-value store" version="7.2.4" method="probed" conf="10"><cpe>cpe:/a:redislabs:redis:7.2.4</cpe></service></port>
+<port protocol="tcp" portid="8080"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="http-proxy" method="table" conf="3"/></port>
+</ports>
+<times srtt="180" rttvar="40" to="100000"/>
+</host>
+<host starttime="1791623100" endtime="1791623109"><status state="down" reason="no-response" reason_ttl="0"/>
+<address addr="10.0.0.6" addrtype="ipv4"/>
+</host>
+<runstats><finished time="1791623109" timestr="Fri Oct 10 09:05:09 2026" summary="Nmap done at Fri Oct 10 09:05:09 2026; 2 IP addresses (1 host up) scanned in 9.02 seconds" elapsed="9.02" exit="success"/><hosts up="1" down="1" total="2"/>
+</runstats>
+</nmaprun>

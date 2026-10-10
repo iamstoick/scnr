@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels: {app: web}
+    spec:
+      hostNetwork: true
+      containers:
+        - name: web
+          image: web:1.0
+          securityContext:
+            privileged: true
+          env:
+            - name: DB_PASSWORD
+              value: "hunter2-not-a-real-pw"
+            - name: FROM_SECRET
+              valueFrom: {secretKeyRef: {name: s, key: k}}
+        - name: sidecar
+          image: sidecar:1.0
+          securityContext: {runAsNonRoot: true}
+          resources:
+            limits: {cpu: 100m, memory: 64Mi}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: web}
+spec: {ports: [{port: 80}]}

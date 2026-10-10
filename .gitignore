@@ -1,0 +1,10 @@
+# local tooling
+.mcp-codebase.db*
+# build output
+/scnr
+/dist/
+# scan data and reports
+.scnr/
+scnr-out/
+*.test
+*.out

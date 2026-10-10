@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "etcd-version"
+info:
+  title: "etcd API exposed"
+  severity: "high"
+  cwe: "CWE-306"
+  what: "A back-end service's HTTP interface is reachable at /version without authentication."
+  why: "Databases, caches, orchestration and registry services exposed to the web can be read, modified or used to pivot into the infrastructure."
+  fix: "Bind the service to a private interface, require authentication, and put it behind a firewall or VPN."
+  tags: ["service", "kubernetes"]
+safety: safe
+http:
+  - method: GET
+    path: ["/version", "/v2/keys", "/v3/kv/range"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["\"etcd(server|cluster)\""]

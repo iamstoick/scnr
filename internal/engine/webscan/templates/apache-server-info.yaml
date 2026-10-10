@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "apache-server-info"
+info:
+  title: "Apache server-info page exposed"
+  severity: "medium"
+  cwe: "CWE-200"
+  what: "A server status or metrics page is public at /server-info."
+  why: "It discloses internal addresses, request paths and load information that help an attacker map the system."
+  fix: "Restrict the status endpoint to localhost or monitoring hosts only."
+  tags: ["status", "apache"]
+safety: safe
+http:
+  - method: GET
+    path: ["/server-info"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        words: ["Apache Server Information"]

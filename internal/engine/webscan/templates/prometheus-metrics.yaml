@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "prometheus-metrics"
+info:
+  title: "Prometheus metrics endpoint exposed"
+  severity: "low"
+  cwe: "CWE-200"
+  what: "A server status or metrics page is public at /metrics."
+  why: "It discloses internal addresses, request paths and load information that help an attacker map the system."
+  fix: "Restrict the status endpoint to localhost or monitoring hosts only."
+  tags: ["status", "metrics"]
+safety: safe
+http:
+  - method: GET
+    path: ["/metrics", "/actuator/prometheus"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(?m)^# (HELP|TYPE) \\w+"]

@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "wp-json-users"
+info:
+  title: "WordPress REST API lists users"
+  severity: "medium"
+  cwe: "CWE-200"
+  what: "The file /wp-json/wp/v2/users discloses software names and versions."
+  why: "Exact versions let an attacker pick known exploits instead of guessing. Low impact on its own."
+  fix: "Remove the file or block access to it in the web server."
+  tags: ["wordpress", "disclosure"]
+safety: safe
+http:
+  - method: GET
+    path: ["/wp-json/wp/v2/users", "/wp-json/wp/v2/users/1"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["\"slug\"\\s*:\\s*\""]

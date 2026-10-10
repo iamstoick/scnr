@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-composer-files"
+info:
+  title: "Composer manifest or lock file exposed"
+  severity: "low"
+  cwe: "CWE-200"
+  what: "The dependency manifest /composer.json is publicly readable."
+  why: "It lists the exact libraries and versions in use, letting an attacker look up known vulnerabilities for each. Low impact on its own."
+  fix: "Deny access to build and dependency files in the web server, or deploy only the built artefacts."
+  tags: ["exposure", "php"]
+safety: safe
+http:
+  - method: GET
+    path: ["/composer.json", "/composer.lock"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["\"(require|packages|name)\"\\s*:"]

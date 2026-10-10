@@ -1,0 +1,84 @@
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2026-06-10T10:00:00Z",
+  "ArtifactName": "alpine-small.tar",
+  "ArtifactType": "container_image",
+  "Metadata": {
+    "OS": {"Family": "alpine", "Name": "3.18.4"},
+    "ImageID": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "DiffIDs": ["sha256:1111111111111111111111111111111111111111111111111111111111111111"],
+    "RepoTags": ["scnr-fixture/alpine-small:3.18"],
+    "ImageConfig": {"architecture": "amd64", "os": "linux", "rootfs": {"type": "layers", "diff_ids": null}, "config": {}}
+  },
+  "Results": [
+    {
+      "Target": "alpine-small.tar (alpine 3.18.4)",
+      "Class": "os-pkgs",
+      "Type": "alpine",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2023-5363",
+          "PkgID": "libcrypto3@3.1.4-r1",
+          "PkgName": "libcrypto3",
+          "PkgIdentifier": {"PURL": "pkg:apk/alpine/libcrypto3@3.1.4-r1?arch=x86_64&distro=3.18.4", "UID": "def"},
+          "InstalledVersion": "3.1.4-r1",
+          "FixedVersion": "3.1.4-r2",
+          "Status": "fixed",
+          "Layer": {"DiffID": "sha256:1111111111111111111111111111111111111111111111111111111111111111"},
+          "SeveritySource": "nvd",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-5363",
+          "Title": "openssl: Incorrect cipher key and IV length processing",
+          "Description": "Issue summary: A bug has been identified in the processing of key and initialisation vector (IV) lengths.",
+          "Severity": "HIGH",
+          "CweIDs": ["CWE-325"],
+          "CVSS": {"nvd": {"V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N", "V3Score": 7.5}},
+          "References": ["https://www.openssl.org/news/secadv/20231024.txt"]
+        },
+        {
+          "VulnerabilityID": "CVE-9999-0001",
+          "PkgName": "musl",
+          "PkgIdentifier": {"PURL": "pkg:apk/alpine/musl@1.2.4-r1?arch=x86_64&distro=3.18.4"},
+          "InstalledVersion": "1.2.4-r1",
+          "Severity": "NOT-A-LEVEL",
+          "Title": "bad severity must be skipped"
+        },
+        {
+          "VulnerabilityID": "../../etc/passwd",
+          "PkgName": "musl",
+          "InstalledVersion": "1.2.4-r1",
+          "Severity": "LOW",
+          "Title": "hostile id must be skipped"
+        }
+      ]
+    },
+    {
+      "Target": "app/package-lock.json",
+      "Class": "lang-pkgs",
+      "Type": "npm",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2020-8203",
+          "PkgName": "lodash",
+          "PkgIdentifier": {"PURL": "pkg:npm/lodash@4.17.20"},
+          "InstalledVersion": "4.17.20",
+          "FixedVersion": "4.17.21",
+          "Status": "fixed",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2020-8203",
+          "Title": "nodejs-lodash: prototype pollution in zipObjectDeep function\u0007\u001b[31m",
+          "Description": "Prototype pollution attack when using _.zipObjectDeep in lodash before 4.17.20. Contact token=ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij for details.",
+          "Severity": "HIGH",
+          "CweIDs": ["CWE-1321"],
+          "CVSS": {"ghsa": {"V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:H", "V3Score": 7.4}},
+          "References": ["https://github.com/lodash/lodash/issues/4874"]
+        }
+      ]
+    },
+    "not-an-object",
+    {
+      "Target": "../../../etc",
+      "Class": "lang-pkgs",
+      "Type": "npm",
+      "Vulnerabilities": [{"VulnerabilityID": "CVE-2020-0001", "PkgName": "x", "InstalledVersion": "1", "Severity": "LOW"}]
+    }
+  ]
+}

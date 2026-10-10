@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "spring-actuator-httptrace"
+info:
+  title: "Spring Boot actuator HTTP trace exposed"
+  severity: "high"
+  cwe: "CWE-532"
+  what: "A debugging or diagnostics endpoint is enabled at /actuator/httptrace."
+  why: "Debug endpoints leak configuration, environment variables, request data and sometimes allow code execution."
+  fix: "Disable debug and profiler features in production and restrict any remaining diagnostics endpoints to internal networks."
+  tags: ["debug", "spring"]
+safety: safe
+http:
+  - method: GET
+    path: ["/actuator/httptrace", "/actuator/httpexchanges", "/trace"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["\"(traces|exchanges)\""]

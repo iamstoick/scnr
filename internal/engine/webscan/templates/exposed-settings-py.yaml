@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-settings-py"
+info:
+  title: "Django settings.py exposed"
+  severity: "critical"
+  cwe: "CWE-538"
+  what: "The file /settings.py is publicly downloadable. Files of this kind hold credentials, keys or connection strings."
+  why: "Anyone on the internet can read the credentials inside and use them to log in to your database, cloud account or third-party services as you."
+  fix: "Remove the file from the web root immediately, rotate every credential it contains, and add a web-server rule that denies access to dotfiles and configuration files."
+  tags: ["exposure", "secrets", "django"]
+safety: safe
+http:
+  - method: GET
+    path: ["/settings.py", "/app/settings.py", "/config/settings.py"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        words: ["SECRET_KEY"]

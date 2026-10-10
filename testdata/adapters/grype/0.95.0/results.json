@@ -1,0 +1,84 @@
+{
+  "matches": [
+    {
+      "vulnerability": {
+        "id": "CVE-2023-5363",
+        "dataSource": "https://security.alpinelinux.org/vuln/CVE-2023-5363",
+        "namespace": "alpine:distro:alpine:3.18",
+        "severity": "High",
+        "urls": ["https://security.alpinelinux.org/vuln/CVE-2023-5363"],
+        "description": "",
+        "cvss": [],
+        "fix": {"versions": ["3.1.4-r2"], "state": "fixed"},
+        "advisories": [],
+        "risk": 12.5
+      },
+      "relatedVulnerabilities": [
+        {
+          "id": "CVE-2023-5363",
+          "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2023-5363",
+          "namespace": "nvd:cpe",
+          "severity": "High",
+          "urls": ["https://www.openssl.org/news/secadv/20231024.txt"],
+          "description": "Issue summary: A bug has been identified in the processing of key and initialisation vector (IV) lengths.",
+          "cvss": [{"version": "3.1", "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N", "metrics": {"baseScore": 7.5}}]
+        }
+      ],
+      "matchDetails": [{"type": "exact-indirect-match", "matcher": "apk-matcher"}],
+      "artifact": {
+        "id": "aaaa",
+        "name": "libcrypto3",
+        "version": "3.1.4-r1",
+        "type": "apk",
+        "locations": [{"path": "/lib/apk/db/installed", "layerID": "sha256:1111111111111111111111111111111111111111111111111111111111111111"}],
+        "language": "",
+        "licenses": ["Apache-2.0"],
+        "cpes": [],
+        "purl": "pkg:apk/alpine/libcrypto3@3.1.4-r1?arch=x86_64&distro=alpine-3.18.4&upstream=openssl",
+        "upstreams": [{"name": "openssl"}]
+      }
+    },
+    {
+      "vulnerability": {
+        "id": "GHSA-p6mc-m468-83gw",
+        "dataSource": "https://github.com/advisories/GHSA-p6mc-m468-83gw",
+        "namespace": "github:language:javascript",
+        "severity": "High",
+        "urls": ["https://github.com/advisories/GHSA-p6mc-m468-83gw"],
+        "description": "Prototype Pollution in lodash. Report to bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhIn0.c2lnbmF0dXJlc2lnbmF0dXJl",
+        "cvss": [{"version": "3.1", "vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:H", "metrics": {"baseScore": 7.4}}],
+        "fix": {"versions": ["4.17.21"], "state": "fixed"}
+      },
+      "relatedVulnerabilities": [{"id": "CVE-2020-8203", "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2020-8203", "namespace": "nvd:cpe", "severity": "High"}],
+      "matchDetails": [],
+      "artifact": {
+        "id": "bbbb",
+        "name": "lodash",
+        "version": "4.17.20",
+        "type": "npm",
+        "locations": [{"path": "/app/package-lock.json", "layerID": "sha256:2222222222222222222222222222222222222222222222222222222222222222"}],
+        "language": "javascript",
+        "purl": "pkg:npm/lodash@4.17.20",
+        "upstreams": []
+      }
+    },
+    {
+      "vulnerability": {"id": "CVE-2024-0001", "severity": "Medium", "fix": {"versions": [], "state": "not-fixed"}},
+      "relatedVulnerabilities": [],
+      "matchDetails": [],
+      "artifact": {"name": "busybox", "version": "1.36.1-r15", "type": "apk", "locations": [{"path": "../../../../etc/passwd"}], "purl": "pkg:apk/alpine/busybox@1.36.1-r15"}
+    },
+    "not-an-object",
+    {
+      "vulnerability": {"id": "CVE-2024-0002", "severity": "Medium"},
+      "artifact": {"name": "", "version": "", "type": "apk", "locations": [{"path": "/lib/apk/db/installed"}]}
+    },
+    {
+      "vulnerability": {"id": "CVE-2024-0003", "severity": "Low", "description": "no purl: ecosystem fallback\u0000\u0001"},
+      "artifact": {"name": "zlib", "version": "1.2.13-r1", "type": "apk", "locations": [{"path": "/lib/apk/db/installed"}]}
+    }
+  ],
+  "source": {"type": "image", "target": {"userInput": "docker-archive:/tmp/alpine-small.tar", "imageID": "sha256:0000", "manifestDigest": "", "mediaType": "", "tags": [], "imageSize": 0, "layers": null, "manifest": null, "config": null, "repoDigests": [], "architecture": "", "os": ""}},
+  "distro": {"name": "alpine", "version": "3.18.4", "idLike": []},
+  "descriptor": {"name": "grype", "version": "0.95.0", "db": {"built": "2026-06-10T01:30:00Z", "schemaVersion": 6}}
+}

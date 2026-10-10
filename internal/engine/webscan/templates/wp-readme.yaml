@@ -1,0 +1,22 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "wp-readme"
+info:
+  title: "WordPress readme.html discloses version"
+  severity: "low"
+  cwe: "CWE-200"
+  what: "The file /readme.html discloses software names and versions."
+  why: "Exact versions let an attacker pick known exploits instead of guessing. Low impact on its own."
+  fix: "Remove the file or block access to it in the web server."
+  tags: ["wordpress", "disclosure"]
+safety: safe
+http:
+  - method: GET
+    path: ["/readme.html"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        words: ["WordPress"]
+      - type: regex
+        regex: ["Version \\d+\\.\\d+"]

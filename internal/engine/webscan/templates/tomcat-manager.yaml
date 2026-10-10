@@ -1,0 +1,22 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "tomcat-manager"
+info:
+  title: "Tomcat Manager application reachable"
+  severity: "medium"
+  cwe: "CWE-284"
+  what: "An administrative or management interface is reachable at /manager/html."
+  why: "Management consoles are high-value targets: default or weak credentials, or a missing login, give full control of the application or server."
+  fix: "Restrict the interface to trusted networks (VPN or allow-listed IPs), require strong authentication and MFA, and remove it if it is not needed."
+  tags: ["admin", "tomcat"]
+safety: safe
+http:
+  - method: GET
+    path: ["/manager/html", "/host-manager/html"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200, 401, 403]
+      - type: header
+        name: "WWW-Authenticate"
+        words: ["Tomcat"]
+        condition: "or"

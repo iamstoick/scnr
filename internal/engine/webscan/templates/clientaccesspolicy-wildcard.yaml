@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "clientaccesspolicy-wildcard"
+info:
+  title: "clientaccesspolicy.xml allows any domain"
+  severity: "medium"
+  cwe: "CWE-942"
+  what: "A cross-domain policy file at /clientaccesspolicy.xml grants access to every domain."
+  why: "Flash and Silverlight style policy files that allow '*' let any website make authenticated requests to this site on behalf of a visitor."
+  fix: "Remove the file or restrict it to the specific domains that need access."
+  tags: ["policy"]
+safety: safe
+http:
+  - method: GET
+    path: ["/clientaccesspolicy.xml"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["<domain\\s+uri=\"\\*\""]

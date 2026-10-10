@@ -1,0 +1,19 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "security-txt-missing"
+info:
+  title: "security.txt not published"
+  severity: "info"
+  cwe: "CWE-200"
+  what: "No security.txt file was found at /.well-known/security.txt."
+  why: "security.txt tells researchers how to report a vulnerability to you. Without it, reports often go nowhere. Informational."
+  fix: "Publish /.well-known/security.txt with a Contact and Expires field (see RFC 9116)."
+  tags: ["info", "policy"]
+safety: safe
+http:
+  - method: GET
+    path: ["/.well-known/security.txt"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+        negative: true

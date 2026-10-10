@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-procfile"
+info:
+  title: "Procfile exposed"
+  severity: "low"
+  cwe: "CWE-538"
+  what: "The configuration file /Procfile is served to anyone who asks for it."
+  why: "Configuration files reveal internal hostnames, settings and sometimes credentials, which makes targeted attacks much easier."
+  fix: "Move configuration out of the web root or deny access to it in the web server, then check whether it contained any secret that must be rotated."
+  tags: ["exposure"]
+safety: safe
+http:
+  - method: GET
+    path: ["/Procfile"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(?m)^(web|worker|release):"]

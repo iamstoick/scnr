@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "swagger-ui"
+info:
+  title: "Swagger / OpenAPI UI exposed"
+  severity: "info"
+  cwe: "CWE-200"
+  what: "API documentation or an API schema is exposed at /swagger-ui.html."
+  why: "It gives a complete map of your API, including endpoints that were meant to be internal. Informational unless the endpoints lack authentication."
+  fix: "Decide deliberately whether the documentation should be public; if not, restrict it to authenticated users."
+  tags: ["api", "docs"]
+safety: safe
+http:
+  - method: GET
+    path: ["/swagger-ui.html", "/swagger-ui/", "/swagger-ui/index.html", "/swagger/index.html", "/api-docs/", "/docs", "/redoc"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["(?i)(swagger-ui|swagger ui|redoc|openapi)"]

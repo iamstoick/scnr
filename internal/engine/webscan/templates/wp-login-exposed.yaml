@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "wp-login-exposed"
+info:
+  title: "WordPress login page reachable"
+  severity: "info"
+  cwe: "CWE-200"
+  what: "The file /wp-login.php is present and public."
+  why: "This is informational: it is normal for many sites but worth knowing about."
+  fix: "Review the contents and make sure nothing sensitive is listed."
+  tags: ["wordpress"]
+safety: safe
+http:
+  - method: GET
+    path: ["/wp-login.php"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        words: ["wp-login", "loginform"]

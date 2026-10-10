@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "exposed-github-dependabot"
+info:
+  title: "GitHub Dependabot configuration exposed"
+  severity: "info"
+  cwe: "CWE-200"
+  what: "The CI/CD configuration /.github/dependabot.yml is publicly readable."
+  why: "It reveals build steps, internal service names and sometimes variable names that hint at secrets."
+  fix: "Exclude CI configuration from the deployed web root."
+  tags: ["exposure", "ci"]
+safety: safe
+http:
+  - method: GET
+    path: ["/.github/dependabot.yml"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        words: ["package-ecosystem"]

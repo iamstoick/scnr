@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "sourcemap-exposed"
+info:
+  title: "JavaScript source map with sources exposed"
+  severity: "medium"
+  cwe: "CWE-540"
+  what: "A JavaScript source map at /main.js.map includes the original source code."
+  why: "Source maps reveal unminified front-end code, internal API routes and comments, which speeds up finding other weaknesses."
+  fix: "Do not publish source maps for production builds, or restrict them to internal networks."
+  tags: ["exposure", "javascript"]
+safety: safe
+http:
+  - method: GET
+    path: ["/main.js.map", "/app.js.map", "/bundle.js.map", "/index.js.map", "/static/js/main.js.map", "/js/app.js.map"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        words: ["\"sourcesContent\"", "\"mappings\""]

@@ -1,0 +1,98 @@
+id: net.open-port
+engine: netscan
+title: Open TCP port
+severity: info
+cwe: CWE-200
+what: A TCP port on this host accepted a connection, meaning a service is listening there.
+why: Every listening service is something an attacker can talk to. Open ports are not a problem by themselves, but each one should be intentional and kept patched.
+fix: If this service is not needed, stop it or block the port with a firewall. If it is needed, make sure it is up to date and only reachable from where it has to be.
+safety: safe
+tags: [network, inventory]
+---
+id: net.exposed-admin-port
+engine: netscan
+title: Remote administration service exposed
+severity: high
+cwe: CWE-284
+what: A remote administration protocol (Telnet, RDP, VNC, WinRM or similar) is listening on this host.
+why: Administration protocols give full control of the machine to anyone who can log in. Exposed to the internet they are constantly attacked with password guessing, and Telnet and VNC send credentials unencrypted.
+fix: Do not expose administration ports publicly. Put them behind a VPN or an allow-listed firewall rule, require strong authentication (keys or MFA), and replace Telnet with SSH.
+safety: safe
+tags: [network, admin]
+---
+id: net.exposed-db-port
+engine: netscan
+title: Database or cache service exposed
+severity: high
+cwe: CWE-284
+what: A database or cache service (Redis, MongoDB, Elasticsearch, Memcached, MySQL, PostgreSQL, MSSQL) is reachable on this host.
+why: Databases hold your data and are often deployed without authentication or with default passwords. Exposed instances are found and emptied or ransomed within hours.
+fix: Bind the service to localhost or a private interface, require authentication, and allow only application servers through the firewall.
+safety: safe
+tags: [network, database]
+---
+id: net.tls.expired
+engine: netscan
+title: TLS certificate has expired
+severity: medium
+cwe: CWE-298
+what: The certificate presented by this service is past its expiry date.
+why: Browsers and clients show warnings or refuse to connect, and users are trained to click through warnings, which makes real attacks easier.
+fix: Renew the certificate and set up automatic renewal (for example with ACME/Let's Encrypt).
+safety: safe
+tags: [tls]
+---
+id: net.tls.expiring-soon
+engine: netscan
+title: TLS certificate expires within 14 days
+severity: low
+cwe: CWE-298
+what: The certificate presented by this service expires in less than two weeks.
+why: When it expires, clients will refuse to connect and the service will effectively be down.
+fix: Renew the certificate now and automate renewal so this does not recur.
+safety: safe
+tags: [tls]
+---
+id: net.tls.self-signed
+engine: netscan
+title: TLS certificate is self-signed or not trusted
+severity: medium
+cwe: CWE-295
+what: The certificate is not issued by a trusted certificate authority (it is self-signed or its chain is incomplete).
+why: Clients cannot tell this server apart from an impostor, so an attacker on the network path can intercept traffic without triggering a different warning.
+fix: Use a certificate from a trusted authority (free via Let's Encrypt) or, for internal services, deploy your internal CA to every client.
+safety: safe
+tags: [tls]
+---
+id: net.tls.hostname-mismatch
+engine: netscan
+title: TLS certificate does not match the hostname
+severity: medium
+cwe: CWE-297
+what: The certificate is valid but was issued for a different name than the one used to reach this service.
+why: Clients will warn or fail, and users learn to ignore the warning, which hides real man-in-the-middle attacks.
+fix: Issue a certificate that includes this hostname in its Subject Alternative Names, or reach the service by the name on the certificate.
+safety: safe
+tags: [tls]
+---
+id: net.tls.legacy-version
+engine: netscan
+title: Legacy TLS version (1.0 or 1.1) accepted
+severity: medium
+cwe: CWE-326
+what: The service completed a handshake using TLS 1.0 or TLS 1.1, protocol versions deprecated since 2021.
+why: These versions have known weaknesses and fail compliance requirements (PCI DSS). Allowing them lets an attacker downgrade a connection to a weaker protocol.
+fix: Configure the server to accept TLS 1.2 and 1.3 only.
+safety: safe
+tags: [tls]
+---
+id: web.redirect-out-of-scope
+engine: netscan
+title: HTTP redirect points outside the authorised scope
+severity: info
+cwe: CWE-601
+what: The service redirected to an address that is not within the scan scope, so scnr did not follow it.
+why: Redirects to internal or unexpected addresses can indicate misconfiguration or an open redirect. Nothing was contacted at the destination.
+fix: Review the redirect target. If it is unintended, fix the application's redirect configuration; if it is intended, add it to scope.allow to include it in future scans.
+safety: safe
+tags: [web]
