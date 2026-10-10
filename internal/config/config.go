@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -58,12 +59,22 @@ type Tools struct {
 	SemgrepRules string `yaml:"semgrep_rules,omitempty"`
 }
 
+// VulnDB configures offline vulnerability bundles (Phase 4a).
+type VulnDB struct {
+	// TrustedKeys are the ed25519 public keys ("ed25519:<base64>", as
+	// printed by `scnr db keygen`) whose bundle signatures are accepted by
+	// `scnr db update --offline-bundle`. Empty means no signed bundle can
+	// load.
+	TrustedKeys []string `yaml:"trusted_keys,omitempty"`
+}
+
 // Config is the whole scnr.yaml.
 type Config struct {
 	Authorization Authorization `yaml:"authorization"`
 	Scope         Scope         `yaml:"scope"`
 	Limits        Limits        `yaml:"limits,omitempty"`
 	Tools         Tools         `yaml:"tools,omitempty"`
+	VulnDB        VulnDB        `yaml:"vulndb,omitempty"`
 	Online        *bool         `yaml:"online,omitempty"`
 	Path          string        `yaml:"-"`
 }
@@ -149,6 +160,11 @@ func (c *Config) Validate() error {
 	}
 	if d := c.Tools.SemgrepRules; d != "" && !filepath.IsAbs(d) {
 		return fmt.Errorf("tools.semgrep_rules must be an absolute path, got %q", d)
+	}
+	for _, k := range c.VulnDB.TrustedKeys {
+		if !strings.HasPrefix(k, "ed25519:") || len(k) > 128 {
+			return fmt.Errorf("vulndb.trusted_keys: %q must be ed25519:<base64> (from `scnr db keygen`)", k)
+		}
 	}
 	return nil
 }

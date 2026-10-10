@@ -179,7 +179,7 @@ type Finding struct {
 type EngineRun struct {
 	Name     string        `json:"name"`
 	Version  string        `json:"version,omitempty"`
-	Status   string        `json:"status"` // ok | failed | skipped: <reason>
+	Status   string        `json:"status"` // ok | failed | skipped: <reason> | partial: <reason>
 	Duration time.Duration `json:"duration_ms"`
 	Error    string        `json:"error,omitempty"`
 }

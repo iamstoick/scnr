@@ -95,7 +95,7 @@ func TestRunChecks(t *testing.T) {
 	if !strings.Contains(buf.String(), "never runs these") || !strings.Contains(buf.String(), "trivy") {
 		t.Fatal(buf.String())
 	}
-	if len(ListsOutbound()) != 3 {
+	if len(ListsOutbound()) != 4 {
 		t.Fatal("outbound list")
 	}
 	if len(ToolOutbound()) != 4 {
@@ -141,4 +141,13 @@ func find(checks []Check, name string) Check {
 func Run2(ctx context.Context, o Options) []Check {
 	checks, _ := Run(ctx, o)
 	return checks
+}
+
+// --online without an injected client is an error rather than a probe
+// through http.DefaultClient.
+func TestOnlineNeedsClient(t *testing.T) {
+	_, err := Run(context.Background(), Options{Home: t.TempDir(), Online: true})
+	if err == nil || !strings.Contains(err.Error(), "HTTP client") {
+		t.Fatalf("want no-client error, got %v", err)
+	}
 }

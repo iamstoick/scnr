@@ -23,6 +23,11 @@ type Dialer struct {
 	Resolver Resolver
 	Limits   *Limits
 	Timeout  time.Duration
+	// RequireAllow makes every destination, private ones included, match an
+	// allow entry (NewEndpointClient: the allow list is a fixed set of
+	// declared hosts, not a scan scope where private space is implicitly
+	// in bounds).
+	RequireAllow bool
 
 	pins *pinSet
 }
@@ -41,7 +46,7 @@ type pinSet struct {
 // with a different connect timeout.
 func (d *Dialer) WithTimeout(t time.Duration) *Dialer {
 	d.ensurePins()
-	return &Dialer{Scope: d.Scope, Resolver: d.Resolver, Limits: d.Limits, Timeout: t, pins: d.pins}
+	return &Dialer{Scope: d.Scope, Resolver: d.Resolver, Limits: d.Limits, Timeout: t, RequireAllow: d.RequireAllow, pins: d.pins}
 }
 
 func (d *Dialer) ensurePins() {
@@ -122,6 +127,18 @@ func (d *Dialer) checkPinned(host string, ips []netip.Addr) error {
 	return nil
 }
 
+// check runs the scope check plus the RequireAllow rule.
+func (d *Dialer) check(host string, ips []netip.Addr, rawURL string) (bool, error) {
+	public, err := d.Scope.Check(host, ips, rawURL)
+	if err != nil {
+		return public, err
+	}
+	if d.RequireAllow && !d.Scope.Allowed(host, ips, rawURL) {
+		return public, &RefusalError{Code: CodeScopeNotAllowed, Target: host, Reason: "not a declared endpoint host"}
+	}
+	return public, nil
+}
+
 // DialContext implements the net.Dialer contract for "tcp" networks.
 func (d *Dialer) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
 	host, port, err := net.SplitHostPort(addr)
@@ -132,7 +149,7 @@ func (d *Dialer) DialContext(ctx context.Context, network, addr string) (net.Con
 	if err != nil {
 		return nil, &RefusalError{Code: CodeUnresolvable, Target: addr, Reason: err.Error()}
 	}
-	public, err := d.Scope.Check(host, ips, "")
+	public, err := d.check(host, ips, "")
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +198,7 @@ func (d *Dialer) CheckURL(ctx context.Context, u *url.URL) error {
 			return &RefusalError{Code: CodeUnresolvable, Target: host, Reason: err.Error()}
 		}
 	}
-	if _, err := d.Scope.Check(host, ips, u.String()); err != nil {
+	if _, err := d.check(host, ips, u.String()); err != nil {
 		return err
 	}
 	return d.checkPinned(host, ips)

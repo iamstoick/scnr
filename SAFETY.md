@@ -68,9 +68,22 @@ These invariants are enforced in code and tests, not by policy alone.
 9. **No telemetry.** Outbound connections scnr itself makes are only:
    in-scope targets, `api.osv.dev` (unless `--offline`; the image engine
    uses the same client for OS packages), `www.cisa.gov` and
-   `epss.cyentia.com` (only during `scnr db update`). External tools run by
-   adapters may fetch their own rule/DB bundles (item 10); `scnr doctor
-   --online` lists both sets.
+   `epss.cyentia.com` with its redirect target `epss.empiricalsecurity.com`
+   (only during `scnr db update`), and
+   `osv-vulnerabilities.storage.googleapis.com` (only during `scnr db
+   bundle build`). Every one of them goes through `safety.NewEndpointClient`,
+   whose fixed host allowlist refuses any other destination, private
+   addresses and redirects included. A component handed no client fails
+   with "no HTTP client" rather than falling back to `http.DefaultClient`.
+   `TestNoRawDialers` parses every non-test source under `internal/`,
+   resolves `net`/`net/http` import aliases, and fails the build on:
+   `net.Dial*`, `http.DefaultClient`/`DefaultTransport`, `http.Get`/`Post`/
+   `Head`/`PostForm`; composite literals, `new()`, and value-typed
+   variables, fields or type declarations of `net.Dialer` or
+   `http.Transport`; any `http.Client` literal outside `internal/safety`
+   (and, inside it, one without a `Transport`); and dot-imports of `net` or
+   `net/http`. External tools run by adapters may fetch their own rule/DB
+   bundles (item 10); `scnr doctor --online` lists both sets.
 10. **External tools run with argument arrays, never shell strings**, a
     minimal environment, output caps (256 MiB) and timeouts. Forbidden
     flags (`--script`, `-sU`, `-O`, `-sC`, `-A`, `-dast`, `-fuzz`, `brute`,
@@ -182,3 +195,39 @@ These invariants are enforced in code and tests, not by policy alone.
     intrusive templates, which do not load in this version), and tags such
     as dos/fuzz/bruteforce/exploit are rejected.
 11. **All SQL is parameterised.** `database/sql` with `?` placeholders only.
+17. **Offline bundles are signed before they are parsed.** `scnr db update
+    --offline-bundle` reads only `manifest.json` (first entry, <= 1 MiB)
+    and `manifest.sig` (second) until an ed25519 signature from
+    `vulndb.trusted_keys` verifies over the exact manifest bytes; a
+    failure is `E_BUNDLE_UNTRUSTED` (exit 3, audited) and no later byte is
+    read, nothing in the database is touched. An unsigned bundle loads only
+    with `--allow-unsigned` in an interactive session (refused with
+    `--non-interactive`), and the acceptance is audited. After the
+    signature: entry names must match a fixed grammar (no symlinks,
+    hardlinks, directories, traversal or unlisted files), the decompressed
+    stream is capped at 2 GiB, entries at 64, lines at 1 MiB, record counts
+    must equal the manifest exactly, each record is decoded strictly
+    (unknown fields rejected) and cleaned (control-stripped, redacted), and
+    every file's SHA-256 must match the manifest. Rows are staged in one
+    transaction and swapped in at commit; any failure rolls back, so
+    `osv_affected`, `kev` and `epss` are never half-loaded. A bundle whose
+    `created_at` is older than the loaded osv-offline data is refused as a
+    downgrade (`E_BUNDLE_DOWNGRADE`, exit 3, audited) unless
+    `--allow-downgrade` is given in an interactive session (gated and
+    audited exactly like `--allow-unsigned`); a `created_at` more than 24h
+    in the future is a bad bundle, so no bundle can claim a date that
+    blocks later real ones. Any decompressed data after the tar end (a
+    trailing gzip member) is a bad bundle and is counted against the 2 GiB
+    cap while being drained. Offline matching evaluates semver ranges
+    (events sorted by version, unparsable boundaries dropped) only for npm,
+    Go, crates.io, Packagist, Hex and Pub; for every other ecosystem it
+    relies on OSV's `versions[]` lists, and an advisory that declares
+    ranges without a version list, or a range with a boundary that is not
+    semver, is reported per ecosystem as `sca.range-unevaluated` with the
+    engine run marked partial, never silently passed. An installed version
+    that is not semver is reported as `sca.version-unparsed`. Bundles are
+    built only from the OSV export bucket through the endpoint client (item
+    9), assembled in a 0700 work directory and renamed into `--out`
+    (refusing a symlink or non-regular file at the destination), and signed
+    with a key that never leaves the building machine (`scnr db keygen`,
+    0600).

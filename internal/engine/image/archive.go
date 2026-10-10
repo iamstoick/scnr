@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/gerald/scnr/internal/engine/sca"
+	"github.com/gerald/scnr/internal/safety"
 	"github.com/gerald/scnr/internal/target"
 )
 
@@ -160,20 +161,9 @@ func isRPMPath(p string) bool {
 	return false
 }
 
-// countingReader enforces a byte budget on a decompressed stream.
-type countingReader struct {
-	r     io.Reader
-	n     *int64
-	limit int64
-}
-
-func (c *countingReader) Read(p []byte) (int, error) {
-	n, err := c.r.Read(p)
-	*c.n += int64(n)
-	if *c.n > c.limit {
-		return n, ErrTooLarge
-	}
-	return n, err
+// capped wraps r in a safety.CountingReader that fails with ErrTooLarge.
+func capped(r io.Reader, n *int64, limit int64) io.Reader {
+	return &safety.CountingReader{R: r, N: n, Limit: limit, Err: ErrTooLarge}
 }
 
 // decompress sniffs gzip (streamed) and zstd (refused); anything else is
@@ -254,8 +244,8 @@ func (c *collector) readLayer(r io.Reader) (*layer, error) {
 	if err != nil {
 		return nil, err
 	}
-	perLayer := &countingReader{r: dr, n: &layerRead, limit: c.lim.LayerBytes}
-	tr := tar.NewReader(&countingReader{r: perLayer, n: &c.imageRead, limit: c.lim.ImageBytes})
+	perLayer := capped(dr, &layerRead, c.lim.LayerBytes)
+	tr := tar.NewReader(capped(perLayer, &c.imageRead, c.lim.ImageBytes))
 	w := c.walker(tr, "layer tar")
 	l := newLayer()
 	for {
@@ -419,7 +409,7 @@ func collectArchive(r io.Reader, lim Limits) (*collector, error) {
 		return nil, err
 	}
 	var outerRead int64
-	tr := tar.NewReader(&countingReader{r: dr, n: &outerRead, limit: lim.ImageBytes})
+	tr := tar.NewReader(capped(dr, &outerRead, lim.ImageBytes))
 	w := c.walker(tr, "image tar")
 	for {
 		hdr, name, done, err := c.nextEntry(w)

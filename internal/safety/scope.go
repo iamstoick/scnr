@@ -24,6 +24,8 @@ const (
 	CodeCIDRTooLarge      = "E_CIDR_TOO_LARGE"
 	CodeConsentDeclined   = "E_CONSENT_DECLINED"
 	CodeUnresolvable      = "E_UNRESOLVABLE"
+	CodeBundleUntrusted   = "E_BUNDLE_UNTRUSTED"
+	CodeBundleDowngrade   = "E_BUNDLE_DOWNGRADE"
 )
 
 // RefusalError is returned when the gate or a dial-time check refuses.

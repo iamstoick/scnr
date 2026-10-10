@@ -799,37 +799,41 @@ type EPSSEntry struct {
 
 // ReplaceKEV replaces the kev table atomically.
 func (s *Store) ReplaceKEV(ctx context.Context, entries []KEVEntry, version string) error {
-	return s.withTx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM kev`); err != nil {
+	return s.withTx(ctx, func(tx *sql.Tx) error { return replaceKEV(ctx, tx, entries, version) })
+}
+
+func replaceKEV(ctx context.Context, tx *sql.Tx, entries []KEVEntry, version string) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM kev`); err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO kev(cve, added, due, product) VALUES (?, ?, ?, ?) ON CONFLICT(cve) DO NOTHING`, e.CVE, e.Added, e.Due, e.Product); err != nil {
 			return err
 		}
-		for _, e := range entries {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO kev(cve, added, due, product) VALUES (?, ?, ?, ?) ON CONFLICT(cve) DO NOTHING`, e.CVE, e.Added, e.Due, e.Product); err != nil {
-				return err
-			}
-		}
-		return setMeta(ctx, tx, "kev", version)
-	})
+	}
+	return setMeta(ctx, tx, "kev", version)
 }
 
 // ReplaceEPSS replaces the epss table atomically.
 func (s *Store) ReplaceEPSS(ctx context.Context, entries []EPSSEntry, version string) error {
-	return s.withTx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM epss`); err != nil {
+	return s.withTx(ctx, func(tx *sql.Tx) error { return replaceEPSS(ctx, tx, entries, version) })
+}
+
+func replaceEPSS(ctx context.Context, tx *sql.Tx, entries []EPSSEntry, version string) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM epss`); err != nil {
+		return err
+	}
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO epss(cve, score, percentile) VALUES (?, ?, ?) ON CONFLICT(cve) DO UPDATE SET score = excluded.score, percentile = excluded.percentile`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, e := range entries {
+		if _, err := stmt.ExecContext(ctx, e.CVE, e.Score, e.Percentile); err != nil {
 			return err
 		}
-		stmt, err := tx.PrepareContext(ctx, `INSERT INTO epss(cve, score, percentile) VALUES (?, ?, ?) ON CONFLICT(cve) DO UPDATE SET score = excluded.score, percentile = excluded.percentile`)
-		if err != nil {
-			return err
-		}
-		defer stmt.Close()
-		for _, e := range entries {
-			if _, err := stmt.ExecContext(ctx, e.CVE, e.Score, e.Percentile); err != nil {
-				return err
-			}
-		}
-		return setMeta(ctx, tx, "epss", version)
-	})
+	}
+	return setMeta(ctx, tx, "epss", version)
 }
 
 func setMeta(ctx context.Context, q execQuerier, source, version string) error {
@@ -846,13 +850,19 @@ type VulnDBMeta struct {
 	Rows      int
 }
 
-// VulnDBStatus returns metadata for kev and epss (absent sources have zero UpdatedAt).
+// vulnDBTables maps each vulndb_meta source to its row table. Table names
+// come from this fixed list, never from input.
+var vulnDBTables = []struct{ source, table string }{{"kev", "kev"}, {"epss", "epss"}, {SourceOSVOffline, "osv_affected"}}
+
+// VulnDBStatus returns metadata for kev, epss and osv-offline (absent
+// sources have zero UpdatedAt).
 func (s *Store) VulnDBStatus(ctx context.Context) ([]VulnDBMeta, error) {
-	out := []VulnDBMeta{{Source: "kev"}, {Source: "epss"}}
-	for i := range out {
+	out := make([]VulnDBMeta, len(vulnDBTables))
+	for i, t := range vulnDBTables {
+		out[i].Source = t.source
 		var at string
 		var ver sql.NullString
-		err := s.db.QueryRowContext(ctx, `SELECT updated_at, version FROM vulndb_meta WHERE source = ?`, out[i].Source).Scan(&at, &ver)
+		err := s.db.QueryRowContext(ctx, `SELECT updated_at, version FROM vulndb_meta WHERE source = ?`, t.source).Scan(&at, &ver)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
@@ -860,8 +870,7 @@ func (s *Store) VulnDBStatus(ctx context.Context) ([]VulnDBMeta, error) {
 			out[i].UpdatedAt = parseTime(at)
 			out[i].Version = ver.String
 		}
-		// Table names come from the fixed list above, never from input.
-		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM `+out[i].Source).Scan(&out[i].Rows); err != nil {
+		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM `+t.table).Scan(&out[i].Rows); err != nil {
 			return nil, err
 		}
 	}

@@ -68,10 +68,11 @@ type App struct {
 	IsTTY      bool
 	Resolver   safety.Resolver
 	// Test hooks for upstream services.
-	OSVBase string
-	KEVURL  string
-	EPSSURL string
-	Verbose bool
+	OSVBase    string
+	KEVURL     string
+	EPSSURL    string
+	BundleBase string
+	Verbose    bool
 
 	configErr  error      // set when scnr.yaml exists but is invalid
 	progressMu sync.Mutex // serialises engine progress lines from concurrent engines

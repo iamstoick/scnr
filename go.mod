@@ -9,6 +9,7 @@ require (
 	github.com/package-url/packageurl-go v0.1.7
 	github.com/spf13/cobra v1.9.1
 	github.com/zclconf/go-cty v1.16.3
+	golang.org/x/mod v0.24.0
 	golang.org/x/net v0.40.0
 	golang.org/x/sync v0.14.0
 	golang.org/x/time v0.11.0
@@ -49,7 +50,6 @@ require (
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0 // indirect
-	golang.org/x/mod v0.24.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.25.0 // indirect
 	golang.org/x/tools v0.33.0 // indirect

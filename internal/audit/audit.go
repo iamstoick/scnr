@@ -29,6 +29,9 @@ const (
 	ActionBaseline      = "baseline"
 	ActionPolicyCheck   = "policy_check"
 	ActionSBOM          = "sbom"
+	ActionKeygen        = "db_keygen"
+	ActionBundleBuild   = "db_bundle_build"
+	ActionBundleVerify  = "db_bundle_verify"
 )
 
 // Writer appends audit entries.

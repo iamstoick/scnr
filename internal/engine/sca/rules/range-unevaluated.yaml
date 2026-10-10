@@ -1,0 +1,9 @@
+id: sca.range-unevaluated
+engine: sca
+title: Advisory ranges that could not be evaluated offline
+severity: info
+what: While matching against the local OSV bundle, some advisories for this ecosystem declare affected version ranges that scnr cannot evaluate offline. Either the ecosystem has no offline version comparator (anything other than npm, Go, crates.io, Packagist, Hex and Pub) and the advisory lists no explicit affected versions, or a range boundary was not valid semver. The listed packages were treated as not affected by those advisories and the engine run is reported as partial.
+why: A vulnerability in one of these packages would be missing from this report. OSV normally publishes explicit version lists for these ecosystems; an advisory without one, or with a malformed boundary, cannot be matched without the online service's comparator.
+fix: Re-run the scan online so osv.dev evaluates the ranges, or verify the named packages against the listed advisories by hand.
+safety: safe
+tags: [sca, coverage]

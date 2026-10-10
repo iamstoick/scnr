@@ -76,6 +76,14 @@ type SkipError struct{ Reason string }
 
 func (e *SkipError) Error() string { return "skipped: " + e.Reason }
 
+// PartialError lets an engine report that it ran and emitted its findings
+// but could not cover everything it was asked to check (e.g. ranges the
+// offline matcher cannot evaluate). The scan is marked Partial but not
+// failed; the engine's findings stand.
+type PartialError struct{ Reason string }
+
+func (e *PartialError) Error() string { return "partial: " + e.Reason }
+
 // Registry holds engines by name.
 type Registry struct {
 	engines map[string]Engine

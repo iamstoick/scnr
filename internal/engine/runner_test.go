@@ -44,6 +44,10 @@ func TestRunnerStatusesAndBoundedParallelism(t *testing.T) {
 	engines := []Engine{
 		&fakeEngine{"a", slow}, &fakeEngine{"b", slow}, &fakeEngine{"c", slow},
 		&fakeEngine{"skip", func(context.Context, EmitFunc) error { return &SkipError{Reason: "offline"} }},
+		&fakeEngine{"partial", func(_ context.Context, emit EmitFunc) error {
+			emit(domain.Finding{RuleID: "y"})
+			return &PartialError{Reason: "ranges"}
+		}},
 		&fakeEngine{"fail", func(context.Context, EmitFunc) error { return errors.New("boom") }},
 		&fakeEngine{"panic", func(context.Context, EmitFunc) error { panic("oops") }},
 		&fakeEngine{"timeout", func(ctx context.Context, _ EmitFunc) error { <-ctx.Done(); return ctx.Err() }},
@@ -63,7 +67,7 @@ func TestRunnerStatusesAndBoundedParallelism(t *testing.T) {
 	if maxActive > 2 {
 		t.Fatalf("parallelism %d exceeded 2", maxActive)
 	}
-	if emitted != 3 {
+	if emitted != 4 {
 		t.Fatalf("emitted %d", emitted)
 	}
 	byName := map[string]domain.EngineRun{}
@@ -75,6 +79,11 @@ func TestRunnerStatusesAndBoundedParallelism(t *testing.T) {
 	}
 	if byName["panic"].Status != "failed" || byName["timeout"].Status != "failed" || byName["timeout"].Error == "" {
 		t.Fatalf("%+v %+v", byName["panic"], byName["timeout"])
+	}
+	// A PartialError keeps the engine's findings and marks the run partial,
+	// neither ok nor failed.
+	if byName["partial"].Status != "partial: ranges" || byName["partial"].Error != "" {
+		t.Fatalf("%+v", byName["partial"])
 	}
 	partial, allFailed := Summarise(runs)
 	if !partial || allFailed {

@@ -1,6 +1,8 @@
 package adapter
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -261,4 +263,30 @@ func (v *Vuln) Finding(rules interface{ MustGet(string) domain.Rule }, red *safe
 	}
 	f.Evidence = []domain.Evidence{sca.PackageEvidence(label, v.Location, red.Clean(v.Ecosystem, 40), name, version, purl)}
 	return f, true
+}
+
+// ReadLine returns the next line of br without its terminator. A line
+// longer than max is consumed to its end and reported as tooLong with no
+// bytes retained, so a hostile stream cannot make the caller hold more
+// than max bytes; the caller decides whether that is a skip (tool output)
+// or a hard error (a signed bundle). err is io.EOF on the last line.
+func ReadLine(br *bufio.Reader, max int) (line []byte, tooLong bool, err error) {
+	var buf []byte
+	for {
+		chunk, rerr := br.ReadSlice('\n')
+		if !tooLong {
+			if len(buf)+len(chunk) > max {
+				tooLong, buf = true, nil
+			} else {
+				buf = append(buf, chunk...)
+			}
+		}
+		if errors.Is(rerr, bufio.ErrBufferFull) {
+			continue
+		}
+		if tooLong {
+			return nil, true, rerr
+		}
+		return bytes.TrimRight(buf, "\r\n"), false, rerr
+	}
 }

@@ -140,11 +140,14 @@ func (r *Runner) runOne(ctx context.Context, e Engine, t domain.Target, o Option
 		run.Version = v.Version()
 	}
 	var skip *SkipError
+	var partial *PartialError
 	switch {
 	case res.err == nil:
 		run.Status = "ok"
 	case errors.As(res.err, &skip):
 		run.Status = "skipped: " + skip.Reason
+	case errors.As(res.err, &partial):
+		run.Status = "partial: " + partial.Reason
 	case errors.Is(ectx.Err(), context.DeadlineExceeded) && ctx.Err() == nil:
 		run.Status = "failed"
 		run.Error = timeoutMessage(ctx, o.Profile.EngineTimeout)

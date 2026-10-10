@@ -1,0 +1,9 @@
+id: sca.version-unparsed
+engine: sca
+title: Package versions that could not be compared offline
+severity: info
+what: While matching against the local OSV bundle, some installed package versions in a semver ecosystem (npm, Go, crates.io, Packagist, Hex, Pub) were not valid semver, so their vulnerability ranges could not be evaluated. These packages were treated as not affected.
+why: A vulnerability in one of these packages would be missing from this report. The usual cause is a non-standard version string in the lockfile (a git ref, a local path or a build tag).
+fix: Pin these packages to released semver versions, or re-run the scan online so osv.dev can resolve them.
+safety: safe
+tags: [sca, coverage]

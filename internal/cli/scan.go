@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -74,7 +73,7 @@ func (a *App) scanCmd() *cobra.Command {
 	f.StringVar(&req.Out, "out", "./scnr-out", "output directory (reports go in <out>/<scan-id>/)")
 	f.StringVar(&req.Formats, "format", "html,json", "report formats (comma list)")
 	f.BoolVar(&req.NonInteractive, "non-interactive", false, "never prompt; refuse anything needing consent")
-	f.BoolVar(&req.Offline, "offline", false, "do not contact osv.dev (SCA is skipped, scan marked partial)")
+	f.BoolVar(&req.Offline, "offline", false, "do not contact osv.dev; SCA uses the loaded offline bundle (scnr db update --offline-bundle) or is skipped")
 	f.IntVar(&req.MaxHosts, "max-hosts", 0, "raise the CIDR host cap to N (audited)")
 	f.StringVar(&req.Ports, "ports", "", "top100|top1000|all|LIST (e.g. 22,80,8000-8100)")
 	f.IntVar(&req.Rate, "rate", 0, "connection attempts per second (lowering is always allowed)")
@@ -101,10 +100,22 @@ func (a *App) engineRegistry() (*engine.Registry, *netscan.Engine, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	osv := &sca.OSVClient{Base: a.OSVBase, Cache: a.Store, HTTP: &http.Client{Timeout: 60 * time.Second}}
+	osvBase := a.OSVBase
+	if osvBase == "" {
+		osvBase = sca.DefaultOSVBase
+	}
+	osvHTTP, err := a.endpointClient(osvBase)
+	if err != nil {
+		return nil, nil, err
+	}
+	osvHTTP.Timeout = 60 * time.Second
+	osv := &sca.OSVClient{Base: a.OSVBase, Cache: a.Store, HTTP: osvHTTP}
 	sc, err := sca.New(osv)
 	if err != nil {
 		return nil, nil, err
+	}
+	if a.Store != nil {
+		sc.Offline = &sca.OfflineClient{Store: a.Store}
 	}
 	ws, err := webscan.New()
 	if err != nil {

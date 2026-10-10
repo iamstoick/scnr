@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/gerald/scnr/internal/domain"
@@ -101,5 +102,16 @@ func TestParseEPSSTolerant(t *testing.T) {
 	}
 	if _, _, err := ParseKEV(bytes.NewBufferString("{nope")); err == nil {
 		t.Fatal("malformed KEV accepted")
+	}
+}
+
+// A nil HTTP client is an error, never a default client (TestNoRawDialers
+// keeps the literal out; this keeps the behaviour out).
+func TestUpdaterNoClient(t *testing.T) {
+	s, _ := store.Open(":memory:")
+	defer s.Close()
+	u := &Updater{Store: s, KEVURL: "http://127.0.0.1:1/kev.json", EPSSURL: "http://127.0.0.1:1/epss.csv.gz"}
+	if _, _, err := u.UpdateAll(context.Background()); err == nil || !strings.Contains(err.Error(), "no HTTP client") {
+		t.Fatalf("want no-client error, got %v", err)
 	}
 }

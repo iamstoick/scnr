@@ -219,7 +219,7 @@ func TestVerificationsAndVulnDB(t *testing.T) {
 		t.Fatal("epss")
 	}
 	metas, _ := s.VulnDBStatus(ctx)
-	if len(metas) != 2 || metas[0].Rows != 1 || metas[0].UpdatedAt.IsZero() {
+	if len(metas) != 3 || metas[0].Rows != 1 || metas[0].UpdatedAt.IsZero() || metas[2].Source != SourceOSVOffline || metas[2].Rows != 0 {
 		t.Fatalf("%+v", metas)
 	}
 	if err := s.VulnCachePut(ctx, "GHSA-x", []byte(`{"id":"GHSA-x"}`)); err != nil {
@@ -294,5 +294,82 @@ func TestWriterStreams50kFindings(t *testing.T) {
 	}
 	if seen != n || it.Err() != nil {
 		t.Fatalf("iterated %d %v", seen, it.Err())
+	}
+}
+
+// Phase 4a: an offline load is all-or-nothing and replaces, never merges.
+func TestOfflineLoadStagesAndRollsBack(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	rec := func(id, name string) AffectedRecord {
+		return AffectedRecord{ID: id, Ecosystem: "npm", Name: name, Body: []byte(`{"id":"` + id + `","ecosystem":"npm","name":"` + name + `"}`)}
+	}
+	l, err := s.BeginOfflineLoad(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := l.Stage(ctx, rec("GHSA-1", "a")); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := s.OSVAffectedCount(ctx); n != 0 {
+		t.Fatalf("rollback left %d rows", n)
+	}
+	if err := l.Stage(ctx, rec("GHSA-1", "a")); !errors.Is(err, ErrLoadFinished) {
+		t.Fatalf("stage after rollback: %v", err)
+	}
+
+	l, _ = s.BeginOfflineLoad(ctx)
+	for _, r := range []AffectedRecord{rec("GHSA-1", "a"), rec("GHSA-2", "a"), rec("GHSA-1", "b"), {ID: "", Ecosystem: "npm", Name: "x"}} {
+		err := l.Stage(ctx, r)
+		if r.ID == "" && err == nil {
+			t.Fatal("record without id accepted")
+		}
+	}
+	if err := l.Commit(ctx, "v1"); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := s.OSVAffectedCount(ctx); n != 3 || l.Rows() != 3 {
+		t.Fatalf("rows %d staged %d", n, l.Rows())
+	}
+	rows, err := s.AffectedFor(ctx, "npm", "a")
+	if err != nil || len(rows) != 2 || rows[0].ID != "GHSA-1" || rows[0].VersionsJSON != "[]" || string(rows[0].Body) == "" {
+		t.Fatalf("AffectedFor: %+v %v", rows, err)
+	}
+	byID, err := s.AffectedByIDs(ctx, []string{"GHSA-1", "nope"})
+	if err != nil || len(byID) != 2 {
+		t.Fatalf("AffectedByIDs: %+v %v", byID, err)
+	}
+	metas, _ := s.VulnDBStatus(ctx)
+	if metas[2].Source != SourceOSVOffline || metas[2].Rows != 3 || metas[2].Version != "v1" {
+		t.Fatalf("%+v", metas[2])
+	}
+
+	// A second load replaces the first entirely.
+	l, _ = s.BeginOfflineLoad(ctx)
+	l.Stage(ctx, rec("GHSA-9", "z"))
+	if err := l.Commit(ctx, "v2"); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := s.OSVAffectedCount(ctx); n != 1 {
+		t.Fatalf("replace: %d rows", n)
+	}
+	if err := l.Commit(ctx, "v3"); !errors.Is(err, ErrLoadFinished) {
+		t.Fatalf("double commit: %v", err)
+	}
+	// Down migration removes the table and its meta row; up restores it empty.
+	if err := s.MigrateDown(ctx, 1, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := s.OSVAffectedCount(ctx); n != 0 {
+		t.Fatal("table survived down/up")
+	}
+	if metas, _ := s.VulnDBStatus(ctx); !metas[2].UpdatedAt.IsZero() {
+		t.Fatal("meta row survived down migration")
 	}
 }

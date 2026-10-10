@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -41,6 +42,13 @@ type OSVClient struct {
 	Sleep func(time.Duration)
 }
 
+// Lookup is what the sca engine needs from a vulnerability source: OSVClient
+// (online) and OfflineClient (signed bundle in the store) both satisfy it.
+type Lookup interface {
+	QueryBatch(ctx context.Context, pkgs []Package) ([][]string, error)
+	GetVulns(ctx context.Context, ids []string) (map[string]*Vuln, error)
+}
+
 // Vuln is the subset of the OSV schema we read.
 type Vuln struct {
 	ID         string   `json:"id"`
@@ -57,31 +65,38 @@ type Vuln struct {
 		Type  string `json:"type"`
 		Score string `json:"score"`
 	} `json:"severity"`
-	Affected []struct {
-		Package struct {
-			Ecosystem string `json:"ecosystem"`
-			Name      string `json:"name"`
-			Purl      string `json:"purl"`
-		} `json:"package"`
-		Ranges []struct {
-			Type   string `json:"type"`
-			Events []struct {
-				Introduced string `json:"introduced"`
-				Fixed      string `json:"fixed"`
-			} `json:"events"`
-		} `json:"ranges"`
-		Versions         []string `json:"versions"`
-		DatabaseSpecific struct {
-			Severity string `json:"severity"`
-		} `json:"database_specific"`
-		EcosystemSpecific struct {
-			Severity string `json:"severity"`
-		} `json:"ecosystem_specific"`
-	} `json:"affected"`
+	Affected         []vulnAffected `json:"affected"`
 	DatabaseSpecific struct {
 		Severity string   `json:"severity"`
 		CWEIDs   []string `json:"cwe_ids"`
 	} `json:"database_specific"`
+}
+
+type vulnAffected struct {
+	Package struct {
+		Ecosystem string `json:"ecosystem"`
+		Name      string `json:"name"`
+		Purl      string `json:"purl"`
+	} `json:"package"`
+	Ranges           []vulnRange `json:"ranges"`
+	Versions         []string    `json:"versions"`
+	DatabaseSpecific struct {
+		Severity string `json:"severity"`
+	} `json:"database_specific"`
+	EcosystemSpecific struct {
+		Severity string `json:"severity"`
+	} `json:"ecosystem_specific"`
+}
+
+type vulnRange struct {
+	Type   string      `json:"type"`
+	Events []vulnEvent `json:"events"`
+}
+
+type vulnEvent struct {
+	Introduced   string `json:"introduced"`
+	Fixed        string `json:"fixed"`
+	LastAffected string `json:"last_affected"`
 }
 
 type batchQuery struct {
@@ -206,15 +221,19 @@ func validVulnID(id string) bool {
 	return true
 }
 
+var errNoHTTPClient = errors.New("osv: no HTTP client")
+
 func (c *OSVClient) do(ctx context.Context, method, path string, body []byte, out any) error {
 	base := c.Base
 	if base == "" {
 		base = DefaultOSVBase
 	}
-	client := c.HTTP
-	if client == nil {
-		client = &http.Client{Timeout: 60 * time.Second}
+	if c.HTTP == nil {
+		// Never fall back to http.DefaultClient: the caller passes an
+		// endpoint client restricted to the OSV host (SAFETY.md item 9).
+		return errNoHTTPClient
 	}
+	client := c.HTTP
 	sleep := c.Sleep
 	if sleep == nil {
 		sleep = time.Sleep

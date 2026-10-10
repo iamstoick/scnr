@@ -103,11 +103,15 @@ func Run(ctx context.Context, o Options) ([]Check, error) {
 		}
 		for _, m := range metas {
 			name := "vulndb " + m.Source
+			refresh := "run `scnr db update`"
+			if m.Source == store.SourceOSVOffline {
+				refresh = "load a signed bundle with `scnr db update --offline-bundle` (needed for --offline SCA only)"
+			}
 			switch {
 			case m.UpdatedAt.IsZero():
-				out = append(out, Check{name, Missing, "not loaded; run `scnr db update`"})
-			case now().Sub(m.UpdatedAt) > vulndb.StaleAfter:
-				out = append(out, Check{name, Old, fmt.Sprintf("%d rows, updated %s ago; run `scnr db update`", m.Rows, now().Sub(m.UpdatedAt).Round(time.Hour))})
+				out = append(out, Check{name, Missing, "not loaded; " + refresh})
+			case now().Sub(m.UpdatedAt) > vulndb.StaleAfterFor(m.Source):
+				out = append(out, Check{name, Old, fmt.Sprintf("%d rows, updated %s ago; %s", m.Rows, now().Sub(m.UpdatedAt).Round(time.Hour), refresh)})
 			default:
 				out = append(out, Check{name, OK, fmt.Sprintf("%d rows, updated %s ago", m.Rows, now().Sub(m.UpdatedAt).Round(time.Minute))})
 			}
@@ -152,11 +156,13 @@ func Run(ctx context.Context, o Options) ([]Check, error) {
 
 	// Outbound (only with --online).
 	if o.Online {
-		c := o.HTTP
-		if c == nil {
-			c = &http.Client{Timeout: 10 * time.Second}
+		if o.HTTP == nil {
+			// Never fall back to http.DefaultClient: the CLI passes an
+			// endpoint client for OutboundURLs (SAFETY.md item 9).
+			return nil, errors.New("doctor: --online needs an HTTP client")
 		}
-		for _, h := range []string{"https://api.osv.dev", "https://www.cisa.gov", "https://epss.cyentia.com"} {
+		c := o.HTTP
+		for _, h := range OutboundURLs() {
 			req, _ := http.NewRequestWithContext(ctx, http.MethodHead, h, nil)
 			resp, err := c.Do(req)
 			if err != nil {
@@ -255,9 +261,15 @@ func PrintInstallGuide(w io.Writer) {
 	}
 }
 
+// OutboundURLs are the non-target origins probed by `doctor --online`.
+func OutboundURLs() []string {
+	return []string{"https://api.osv.dev", "https://www.cisa.gov", "https://epss.cyentia.com", vulndb.DefaultBundleBase}
+}
+
 // ListsOutbound is the fixed list of non-target hosts scnr may contact.
 func ListsOutbound() []string {
-	return []string{"api.osv.dev (SCA lookups, unless --offline)", "www.cisa.gov (KEV, during db update)", "epss.cyentia.com (EPSS, during db update)"}
+	return []string{"api.osv.dev (SCA lookups, unless --offline)", "www.cisa.gov (KEV, during db update)", "epss.cyentia.com / epss.empiricalsecurity.com (EPSS and its redirect, during db update)",
+		vulndb.GCSHost + " (OSV exports, only during db bundle build)"}
 }
 
 // ToolOutbound lists what the external tools contact on their own when

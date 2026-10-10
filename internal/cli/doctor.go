@@ -29,7 +29,15 @@ func (a *App) doctorCmd() *cobra.Command {
 			for _, ad := range adapters {
 				detectors[ad.Binary()] = ad
 			}
-			checks, err := doctor.Run(cmd.Context(), doctor.Options{Home: a.Home, ConfigPath: a.ConfigPath, Store: a.Store, Online: online, Adapters: detectors})
+			opts := doctor.Options{Home: a.Home, ConfigPath: a.ConfigPath, Store: a.Store, Online: online, Adapters: detectors}
+			if online {
+				// Reachability probes go through the same endpoint-restricted
+				// client as the real fetches (SAFETY.md item 9).
+				if opts.HTTP, err = a.endpointClient(doctor.OutboundURLs()...); err != nil {
+					return err
+				}
+			}
+			checks, err := doctor.Run(cmd.Context(), opts)
 			if err != nil {
 				return err
 			}

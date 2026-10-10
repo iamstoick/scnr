@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,6 +23,10 @@ import (
 const (
 	KEVURL  = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
 	EPSSURL = "https://epss.cyentia.com/epss_scores-current.csv.gz"
+	// EPSSRedirectURL is where epss.cyentia.com redirects today (FIRST moved
+	// the feed); it is declared so the endpoint client may follow that one
+	// hop and nothing else.
+	EPSSRedirectURL = "https://epss.empiricalsecurity.com/"
 
 	// MaxFeedBytes caps a downloaded feed.
 	MaxFeedBytes = 256 << 20
@@ -97,17 +102,20 @@ func (u *Updater) UpdateEPSS(ctx context.Context) (int, error) {
 	return len(entries), nil
 }
 
+// errNoHTTPClient: a nil client never falls back to http.DefaultClient; the
+// caller must pass an endpoint client (SAFETY.md item 9).
+var errNoHTTPClient = errors.New("vulndb: no HTTP client")
+
 func (u *Updater) fetch(ctx context.Context, url string) (io.ReadCloser, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", "scnr")
-	c := u.HTTP
-	if c == nil {
-		c = &http.Client{Timeout: 5 * time.Minute}
+	if u.HTTP == nil {
+		return nil, errNoHTTPClient
 	}
-	resp, err := c.Do(req)
+	resp, err := u.HTTP.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetch %s: %w", url, err)
 	}

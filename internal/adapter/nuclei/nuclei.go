@@ -235,7 +235,7 @@ func (a *Adapter) Parse(r io.Reader, emit func(domain.Finding) error) error {
 	red := safety.NewRedactor()
 	bad := 0
 	for {
-		line, tooLong, rerr := readLine(br, maxLineSize)
+		line, tooLong, rerr := adapter.ReadLine(br, maxLineSize)
 		if rerr != nil && !errors.Is(rerr, io.EOF) {
 			return fmt.Errorf("nuclei output: %w", rerr)
 		}
@@ -265,32 +265,6 @@ func (a *Adapter) Parse(r io.Reader, emit func(domain.Finding) error) error {
 		return fmt.Errorf("nuclei output: %d line(s) were malformed or over %d bytes and were skipped", bad, maxLineSize)
 	}
 	return nil
-}
-
-// readLine returns the next line without its terminator. A line longer than
-// max is consumed to its end and reported with tooLong=true (line is nil) so
-// the caller can count it and keep going; memory stays bounded by max plus
-// the reader's buffer. err is io.EOF once the input is exhausted, possibly
-// alongside a final unterminated line.
-func readLine(br *bufio.Reader, max int) (line []byte, tooLong bool, err error) {
-	var buf []byte
-	for {
-		chunk, rerr := br.ReadSlice('\n')
-		if !tooLong {
-			if len(buf)+len(chunk) > max {
-				tooLong, buf = true, nil
-			} else {
-				buf = append(buf, chunk...)
-			}
-		}
-		if errors.Is(rerr, bufio.ErrBufferFull) {
-			continue
-		}
-		if tooLong {
-			return nil, true, rerr
-		}
-		return bytes.TrimRight(buf, "\r\n"), false, rerr
-	}
 }
 
 func (a *Adapter) finding(res *result, red *safety.Redactor) (domain.Finding, bool) {
