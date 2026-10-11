@@ -120,7 +120,7 @@ func (a *App) Open(ctx context.Context) error {
 	a.Store = s
 	aw, err := audit.New(s, a.AuditFile)
 	if err != nil {
-		s.Close()
+		s.Close() //nolint:errcheck // best effort; the audit error is the real one
 		return err
 	}
 	a.Audit = aw
@@ -176,10 +176,10 @@ func (a *App) openAndGetScan(ctx context.Context, id string) (*domain.Scan, erro
 // Close releases resources.
 func (a *App) Close() {
 	if a.Audit != nil {
-		a.Audit.Close()
+		a.Audit.Close() //nolint:errcheck // shutdown path; nothing actionable
 	}
 	if a.Store != nil {
-		a.Store.Close()
+		a.Store.Close() //nolint:errcheck // shutdown path; nothing actionable
 		a.Store = nil
 	}
 }

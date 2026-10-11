@@ -175,7 +175,7 @@ func Run(ctx context.Context, o Options) ([]Check, error) {
 				continue
 			}
 			io.Copy(io.Discard, resp.Body) //nolint:errcheck
-			resp.Body.Close()
+			resp.Body.Close()              //nolint:errcheck // probe only; status already recorded
 			out = append(out, Check{"outbound " + h, OK, fmt.Sprintf("HTTP %d", resp.StatusCode)})
 		}
 	}
@@ -255,7 +255,7 @@ func Print(w io.Writer, checks []Check) {
 	for _, c := range checks {
 		fmt.Fprintf(tw, "%s\t%s\t%s\n", c.Name, c.Status, c.Detail)
 	}
-	tw.Flush()
+	_ = tw.Flush()
 }
 
 // PrintInstallGuide prints copy-pasteable commands for every tool.

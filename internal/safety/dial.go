@@ -306,7 +306,7 @@ func (t *limitedTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 
 // ReadBody reads at most max bytes of a response body and closes it.
 func ReadBody(resp *http.Response, max int64) ([]byte, error) {
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return io.ReadAll(io.LimitReader(resp.Body, max))
 }
 

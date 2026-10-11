@@ -61,7 +61,7 @@ func (u *Updater) UpdateKEV(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer rc.Close()
+	defer rc.Close() //nolint:errcheck // feed download cleanup
 	entries, version, err := ParseKEV(rc)
 	if err != nil {
 		return 0, fmt.Errorf("parse KEV: %w", err)
@@ -82,14 +82,14 @@ func (u *Updater) UpdateEPSS(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer rc.Close()
+	defer rc.Close() //nolint:errcheck // feed download cleanup
 	var r io.Reader = rc
 	if strings.HasSuffix(url, ".gz") {
 		gz, err := gzip.NewReader(rc)
 		if err != nil {
 			return 0, fmt.Errorf("gunzip EPSS: %w", err)
 		}
-		defer gz.Close()
+		defer gz.Close() //nolint:errcheck // feed download cleanup
 		r = gz
 	}
 	entries, version, err := ParseEPSS(r)
@@ -120,7 +120,7 @@ func (u *Updater) fetch(ctx context.Context, url string) (io.ReadCloser, error) 
 		return nil, fmt.Errorf("fetch %s: %w", url, err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
+		resp.Body.Close() //nolint:errcheck // best effort; the HTTP error is the real one
 		return nil, fmt.Errorf("fetch %s: HTTP %d", url, resp.StatusCode)
 	}
 	return struct {

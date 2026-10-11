@@ -412,7 +412,7 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 	if err != nil {
 		return nil, ExitUsage, err
 	}
-	defer os.RemoveAll(scratch)
+	defer os.RemoveAll(scratch) //nolint:errcheck // best-effort temp cleanup
 	opts.Scratch = scratch
 
 	enricher, err := vulndb.NewEnricher(ctx, a.Store)

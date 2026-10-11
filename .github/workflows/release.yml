@@ -1,0 +1,37 @@
+# scnr release: tag v* with `git tag v0.1.0 && git push origin v0.1.0`
+# to publish stripped static binaries for both supported platforms.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: build stripped binaries
+        run: |
+          set -e
+          mkdir -p dist
+          flags="-s -w -X main.version=${GITHUB_REF_NAME}"
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="$flags" -o dist/scnr-linux-amd64 ./cmd/scnr
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="$flags" -o dist/scnr-darwin-arm64 ./cmd/scnr
+          for b in dist/scnr-*; do
+            bytes=$(wc -c < "$b")
+            echo "$b: $bytes bytes"
+            test "$bytes" -le 75497472 || { echo "B11 budget blown: $b exceeds 72 MiB"; exit 1; }
+          done
+          (cd dist && sha256sum scnr-* > checksums.txt && cat checksums.txt)
+      - name: publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" dist/scnr-linux-amd64 dist/scnr-darwin-arm64 dist/checksums.txt --title "${GITHUB_REF_NAME}" --generate-notes

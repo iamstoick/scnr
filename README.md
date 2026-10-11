@@ -23,7 +23,30 @@ The result is that most projects get scanned never, or with a pile of disconnect
 
 ## Installation
 
-Prerequisites: Go 1.24+ to build from source. No runtime dependencies — `scnr` is a single static binary.
+### Prebuilt binary (recommended)
+
+Download the latest release for your platform (single static binary, no runtime dependencies):
+
+```sh
+# macOS (Apple Silicon)
+curl -L -o scnr https://github.com/iamstoick/scnr/releases/latest/download/scnr-darwin-arm64
+# Linux (x86_64)
+curl -L -o scnr https://github.com/iamstoick/scnr/releases/latest/download/scnr-linux-amd64
+
+chmod +x scnr
+./scnr version
+```
+
+Verify the download against the published checksums:
+
+```sh
+curl -L -o checksums.txt https://github.com/iamstoick/scnr/releases/latest/download/checksums.txt
+shasum -a 256 -c checksums.txt
+```
+
+### From source
+
+Prerequisites: Go 1.26+.
 
 ```sh
 git clone https://github.com/iamstoick/scnr.git

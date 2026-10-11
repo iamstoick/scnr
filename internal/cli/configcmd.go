@@ -41,7 +41,9 @@ func (a *App) configCmd() *cobra.Command {
 				return err
 			}
 			fmt.Fprintln(a.Stdout, "---")
-			a.Stdout.Write(b)
+			if _, err := a.Stdout.Write(b); err != nil {
+				return err
+			}
 			return nil
 		},
 	}

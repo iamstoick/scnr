@@ -1,0 +1,24 @@
+# golangci-lint v2 configuration. CI runs `golangci-lint run ./...`.
+version: "2"
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  settings:
+    errcheck:
+      # Cleanup-path Close/Rollback errors are unactionable by design
+      # (deferred closes, error-path rollbacks); fmt writes to httptest
+      # recorders in fakes likewise. Everything else must be handled.
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (*os.File).Close
+        - (*database/sql.DB).Close
+        - (*database/sql.Rows).Close
+        - (*database/sql.Stmt).Close
+        - (*database/sql.Tx).Rollback
+  exclusions:
+    rules:
+      - path: _test\.go$
+        linters: [errcheck]
+      - path: (adapters?test|awstest|imagetest|vulndbtest)/
+        linters: [errcheck]

@@ -214,9 +214,10 @@ func validVulnID(id string) bool {
 		return false
 	}
 	for _, r := range id {
-		if !(r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' || r == '_' || r == '.') {
-			return false
+		if r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' || r == '_' || r == '.' {
+			continue
 		}
+		return false
 	}
 	return true
 }
@@ -265,7 +266,7 @@ func (c *OSVClient) do(ctx context.Context, method, path string, body []byte, ou
 			continue
 		}
 		data, err := io.ReadAll(io.LimitReader(resp.Body, osvMaxBodyBytes))
-		resp.Body.Close()
+		resp.Body.Close() //nolint:errcheck // body fully read; read error is the real one
 		if err != nil {
 			lastErr = err
 			continue

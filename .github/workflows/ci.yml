@@ -1,0 +1,73 @@
+# scnr CI: tests, vet, formatting, binary size gate (B11), govulncheck, lint.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: gofmt
+        run: test -z "$(gofmt -l cmd internal)"
+      - name: vet
+        run: go vet ./...
+      - name: test
+        run: go test ./...
+
+  size:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      # B11: the stripped static binary stays under 72 MiB per platform.
+      - name: stripped size gate (linux/amd64, darwin/arm64)
+        run: |
+          set -e
+          mkdir -p dist
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/scnr-linux-amd64 ./cmd/scnr
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/scnr-darwin-arm64 ./cmd/scnr
+          for b in dist/scnr-*; do
+            bytes=$(wc -c < "$b")
+            echo "$b: $bytes bytes"
+            test "$bytes" -le 75497472 || { echo "B11 budget blown: $b exceeds 72 MiB"; exit 1; }
+          done
+
+  vuln:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          "$(go env GOPATH)/bin/govulncheck" ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: golangci-lint
+        run: |
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
+          "$(go env GOPATH)/bin/golangci-lint" run --timeout 5m ./...

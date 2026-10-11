@@ -162,11 +162,11 @@ func TestSuppressionsLifecycle(t *testing.T) {
 	fpA := domain.Fingerprint("high.a", "host:127.0.0.1", "127.0.0.1:1")
 	now := time.Now()
 	for _, bad := range []Suppression{
-		{Fingerprint: fpA, ExpiresAt: now.Add(time.Hour)},                              // no reason
-		{Fingerprint: fpA, Reason: "r"},                                                // no expiry
-		{Fingerprint: fpA, Reason: "r", ExpiresAt: now.Add(-time.Hour)},                // past
-		{Fingerprint: fpA, Reason: "r", ExpiresAt: now.Add(400 * 24 * time.Hour)},      // > 365d
-		{Reason: "r", ExpiresAt: now.Add(time.Hour)},                                   // no target
+		{Fingerprint: fpA, ExpiresAt: now.Add(time.Hour)},                         // no reason
+		{Fingerprint: fpA, Reason: "r"},                                           // no expiry
+		{Fingerprint: fpA, Reason: "r", ExpiresAt: now.Add(-time.Hour)},           // past
+		{Fingerprint: fpA, Reason: "r", ExpiresAt: now.Add(400 * 24 * time.Hour)}, // > 365d
+		{Reason: "r", ExpiresAt: now.Add(time.Hour)},                              // no target
 	} {
 		if _, _, err := s.AddSuppression(ctx, bad); err == nil {
 			t.Fatalf("accepted invalid suppression %+v", bad)

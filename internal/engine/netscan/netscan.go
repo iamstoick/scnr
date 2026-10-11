@@ -79,7 +79,7 @@ func loadPorts() ([]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck // embedded asset; close cannot fail usefully
 	var out []int
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
@@ -312,7 +312,7 @@ func (e *Engine) scanHost(ctx context.Context, host string, ports []int, conc in
 // dialer as the initial connect.
 func (e *Engine) probe(ctx context.Context, conn net.Conn, dialer *safety.Dialer, host string, port int, assetKey string, t domain.Target, o engine.Options, emit engine.EmitFunc) error {
 	banner := readBanner(conn)
-	conn.Close()
+	conn.Close() //nolint:errcheck // probe socket; banner already captured
 	loc := net.JoinHostPort(host, strconv.Itoa(port))
 	service := guessService(port, banner)
 	red := o.Redactor
@@ -459,11 +459,11 @@ func (e *Engine) checkTLS(ctx context.Context, dialer *safety.Dialer, host strin
 	tc := tls.Client(raw, cfg)
 	_ = tc.SetDeadline(time.Now().Add(connectTimeout * 2))
 	if err := tc.HandshakeContext(ctx); err != nil {
-		raw.Close()
+		raw.Close() //nolint:errcheck // failed handshake; nothing to report
 		return nil, nil, nil
 	}
 	state := tc.ConnectionState()
-	tc.Close()
+	tc.Close() //nolint:errcheck // state already captured
 	if len(state.PeerCertificates) == 0 {
 		return nil, nil, nil
 	}
@@ -521,7 +521,7 @@ func (e *Engine) offersVersion(ctx context.Context, dialer *safety.Dialer, loc, 
 	if err != nil {
 		return false, refusalOnly(err)
 	}
-	defer raw.Close()
+	defer raw.Close()                                                                                  //nolint:errcheck // version probe; boolean already decided
 	cfg := &tls.Config{InsecureSkipVerify: true, ServerName: serverName, MinVersion: v, MaxVersion: v} //nolint:gosec // handshake-only version probe
 	tc := tls.Client(raw, cfg)
 	_ = tc.SetDeadline(time.Now().Add(connectTimeout * 2))

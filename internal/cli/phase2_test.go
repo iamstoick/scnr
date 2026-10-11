@@ -88,7 +88,12 @@ func TestScanURLAllFormatsAndMissingAdaptersSkip(t *testing.T) {
 	var log struct {
 		Version string
 		Runs    []struct {
-			Tool    struct{ Driver struct{ Name string; Rules []any } }
+			Tool struct {
+				Driver struct {
+					Name  string
+					Rules []any
+				}
+			}
 			Results []struct {
 				RuleID              string
 				PartialFingerprints map[string]string

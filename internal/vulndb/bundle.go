@@ -386,7 +386,7 @@ func (r *BundleReader) Load(ctx context.Context, path string, allowUnsigned, all
 	})
 	if err != nil {
 		if load != nil {
-			load.Rollback()
+			load.Rollback() //nolint:errcheck // best effort; the load error is the real one
 		}
 		return res, err
 	}
@@ -436,7 +436,7 @@ func (r *BundleReader) walk(ctx context.Context, path string, allowUnsigned bool
 	if err != nil {
 		return res, fmt.Errorf("%w: not gzip: %v", ErrBadBundle, err)
 	}
-	defer gz.Close()
+	defer gz.Close() //nolint:errcheck // bundle stream cleanup
 	limit := r.MaxDecompressed
 	if limit <= 0 {
 		limit = MaxBundleDecompressed
@@ -576,8 +576,8 @@ func (r *BundleReader) walk(ctx context.Context, path string, allowUnsigned bool
 		}
 		h := sha256.New()
 		body := io.TeeReader(tr, h)
-		switch {
-		case hdr.Name == kevName:
+		switch hdr.Name {
+		case kevName:
 			kev, version, err := ParseKEV(body)
 			if err != nil {
 				return res, fmt.Errorf("%w: kev.json: %v", ErrBadBundle, err)
@@ -588,7 +588,7 @@ func (r *BundleReader) walk(ctx context.Context, path string, allowUnsigned bool
 					return res, err
 				}
 			}
-		case hdr.Name == epssName:
+		case epssName:
 			epss, version, err := ParseEPSS(body)
 			if err != nil {
 				return res, fmt.Errorf("%w: epss.csv: %v", ErrBadBundle, err)

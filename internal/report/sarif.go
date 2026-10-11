@@ -34,12 +34,12 @@ type sarifLog struct {
 }
 
 type sarifRun struct {
-	Tool              sarifTool          `json:"tool"`
-	AutomationDetails *sarifAutomation   `json:"automationDetails,omitempty"`
-	Invocations       []sarifInvocation  `json:"invocations"`
-	Results           []sarifResult      `json:"results"`
-	ColumnKind        string             `json:"columnKind"`
-	Properties        map[string]any     `json:"properties,omitempty"`
+	Tool              sarifTool         `json:"tool"`
+	AutomationDetails *sarifAutomation  `json:"automationDetails,omitempty"`
+	Invocations       []sarifInvocation `json:"invocations"`
+	Results           []sarifResult     `json:"results"`
+	ColumnKind        string            `json:"columnKind"`
+	Properties        map[string]any    `json:"properties,omitempty"`
 }
 
 type sarifAutomation struct {
@@ -106,8 +106,8 @@ type sarifSuppression struct {
 }
 
 type sarifLocation struct {
-	PhysicalLocation *sarifPhysical  `json:"physicalLocation,omitempty"`
-	LogicalLocations []sarifLogical  `json:"logicalLocations,omitempty"`
+	PhysicalLocation *sarifPhysical `json:"physicalLocation,omitempty"`
+	LogicalLocations []sarifLogical `json:"logicalLocations,omitempty"`
 }
 
 type sarifPhysical struct {
@@ -306,7 +306,7 @@ func (s *SARIF) Write(ctx context.Context, it *store.FindingIterator, scan domai
 			driverName = "scnr/" + name
 		}
 		runs = append(runs, sarifRun{
-			Tool: sarifTool{Driver: sarifDriver{Name: driverName, Version: firstNonEmpty(er.Version, s.Meta.Version), InformationURI: "https://github.com/gerald/scnr", Rules: acc.rules}},
+			Tool:              sarifTool{Driver: sarifDriver{Name: driverName, Version: firstNonEmpty(er.Version, s.Meta.Version), InformationURI: "https://github.com/gerald/scnr", Rules: acc.rules}},
 			AutomationDetails: &sarifAutomation{ID: "scnr/" + scan.ID + "/" + name},
 			Invocations: []sarifInvocation{{
 				ExecutionSuccessful: exit == 0, ExitCode: &exit, ExitCodeDescription: er.Status,

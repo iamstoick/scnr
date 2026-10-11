@@ -110,7 +110,7 @@ func (b *Builder) Build(ctx context.Context) (BuildResult, error) {
 	if err != nil {
 		return res, err
 	}
-	defer os.RemoveAll(work)
+	defer os.RemoveAll(work) //nolint:errcheck // best-effort temp cleanup
 
 	budget := int64(MaxBuildBytes)
 	var files []FileEntry
@@ -202,7 +202,7 @@ func (b *Builder) buildEcosystem(ctx context.Context, base, eco, work string, bu
 	if err != nil {
 		return FileEntry{}, 0, err
 	}
-	defer os.Remove(zipPath)
+	defer os.Remove(zipPath) //nolint:errcheck // best-effort temp cleanup
 	zf, err := os.Open(zipPath)
 	if err != nil {
 		return FileEntry{}, 0, err
@@ -243,7 +243,7 @@ func (b *Builder) buildEcosystem(ctx context.Context, base, eco, work string, bu
 			continue
 		}
 		data, err := io.ReadAll(io.LimitReader(rc, MaxZipEntryBytes+1))
-		rc.Close()
+		rc.Close() //nolint:errcheck // zip entry fully read; read error is the real one
 		if err != nil || len(data) > MaxZipEntryBytes {
 			skipped++
 			continue
@@ -295,7 +295,7 @@ func (b *Builder) download(ctx context.Context, u, work string, budget *int64) (
 	if err != nil {
 		return "", 0, fmt.Errorf("fetch %s: %w", u, err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // download cleanup
 	if resp.StatusCode != http.StatusOK {
 		return "", 0, fmt.Errorf("fetch %s: HTTP %d", u, resp.StatusCode)
 	}
@@ -308,11 +308,11 @@ func (b *Builder) download(ctx context.Context, u, work string, budget *int64) (
 		err = cerr
 	}
 	if err != nil {
-		os.Remove(tmp.Name())
+		os.Remove(tmp.Name()) //nolint:errcheck // best effort; the fetch error is the real one
 		return "", 0, fmt.Errorf("fetch %s: %w", u, err)
 	}
 	if n > *budget {
-		os.Remove(tmp.Name())
+		os.Remove(tmp.Name()) //nolint:errcheck // best effort; the budget error is the real one
 		return "", 0, fmt.Errorf("fetch %s: exceeds the %d byte build budget", u, MaxBuildBytes)
 	}
 	*budget -= n

@@ -503,7 +503,7 @@ func LoadDir(dir string) ([]*Template, []error) {
 	n := 0
 	for _, e := range entries {
 		name := e.Name()
-		if !e.Type().IsRegular() || !(strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml")) {
+		if !e.Type().IsRegular() || !strings.HasSuffix(name, ".yaml") && !strings.HasSuffix(name, ".yml") {
 			continue
 		}
 		n++
