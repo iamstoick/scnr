@@ -12,7 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gerald/scnr/internal/engine/image/imagetest"
+	"github.com/iamstoick/scnr/internal/engine/image/imagetest"
 )
 
 func main() {

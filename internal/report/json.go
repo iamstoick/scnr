@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/store"
 )
 
 // JSON writes {schema_version, scan, assets[], findings[]} streaming the

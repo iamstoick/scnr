@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/store"
 )
 
 // Upstream URLs (the only non-target hosts scnr ever contacts besides osv.dev).

@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/gerald/scnr/internal/audit"
-	"github.com/gerald/scnr/internal/config"
+	"github.com/iamstoick/scnr/internal/audit"
+	"github.com/iamstoick/scnr/internal/config"
 )
 
 func (a *App) policyCmd() *cobra.Command {

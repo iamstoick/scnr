@@ -17,6 +17,10 @@ type EndpointPolicy struct {
 	// client. It exists for instance-credential lookups only
 	// (cloud.aws.instance_credentials: true) and the caller audits it.
 	AllowMetadata bool
+	// RefuseRedirects makes the client never follow redirects: the
+	// caller sees the 3xx response (ErrUseLastResponse) instead. Set
+	// for the daemon notify client, which must not be steered.
+	RefuseRedirects bool
 }
 
 // NewEndpointClient returns a client for a fixed, declared set of non-target
@@ -49,6 +53,6 @@ func NewEndpointClientPolicy(hosts []string, o HTTPOptions, p EndpointPolicy) (*
 	if err != nil {
 		return nil, fmt.Errorf("endpoint client: %w", err)
 	}
-	d := &Dialer{Scope: scope, RequireAllow: true, RefusePrivate: p.RefusePrivate}
+	d := &Dialer{Scope: scope, RequireAllow: true, RefusePrivate: p.RefusePrivate, RefuseRedirects: p.RefuseRedirects}
 	return NewHTTPClient(d, o), nil
 }

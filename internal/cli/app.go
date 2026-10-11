@@ -13,12 +13,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/gerald/scnr/internal/audit"
-	"github.com/gerald/scnr/internal/config"
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/logx"
-	"github.com/gerald/scnr/internal/safety"
-	"github.com/gerald/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/audit"
+	"github.com/iamstoick/scnr/internal/config"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/logx"
+	"github.com/iamstoick/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/store"
 )
 
 // Exit codes (Section 5.8).
@@ -203,7 +203,8 @@ func (a *App) Root() *cobra.Command {
 	pf.BoolVarP(&a.Verbose, "verbose", "v", false, "debug logging")
 
 	root.AddCommand(a.scanCmd(), a.doctorCmd(), a.reportCmd(), a.findingsCmd(), a.assetsCmd(), a.scopeCmd(), a.verifyCmd(), a.dbCmd(), a.configCmd(), a.versionCmd(),
-		a.acceptCmd(), a.baselineCmd(), a.policyCmd(), a.templatesCmd(), a.sbomCmd())
+		a.acceptCmd(), a.baselineCmd(), a.policyCmd(), a.templatesCmd(), a.sbomCmd(),
+		a.scheduleCmd(), a.daemonCmd())
 	return root
 }
 

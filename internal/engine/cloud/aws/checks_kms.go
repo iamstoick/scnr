@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
 
-	"github.com/gerald/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/domain"
 )
 
 // checkKMS: customer-managed symmetric keys without automatic rotation.

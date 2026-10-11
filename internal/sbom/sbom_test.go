@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/engine/image"
-	"github.com/gerald/scnr/internal/engine/sca"
-	"github.com/gerald/scnr/internal/jsonschema"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/engine/image"
+	"github.com/iamstoick/scnr/internal/engine/sca"
+	"github.com/iamstoick/scnr/internal/jsonschema"
 )
 
 func schema(t *testing.T) *jsonschema.Validator {

@@ -19,8 +19,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/safety"
 )
 
 // ErrAmbiguous is returned when no rule matches.

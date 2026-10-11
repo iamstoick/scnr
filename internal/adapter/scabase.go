@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"path/filepath"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/engine"
-	"github.com/gerald/scnr/internal/engine/sca"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/engine"
+	"github.com/iamstoick/scnr/internal/engine/sca"
 )
 
 // SCABase is the shared scaffolding of adapters that emit shared-scheme SCA

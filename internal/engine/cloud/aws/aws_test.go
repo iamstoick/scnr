@@ -15,11 +15,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"github.com/gerald/scnr/internal/config"
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/engine"
-	"github.com/gerald/scnr/internal/engine/cloud/aws/awstest"
-	"github.com/gerald/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/config"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/engine"
+	"github.com/iamstoick/scnr/internal/engine/cloud/aws/awstest"
+	"github.com/iamstoick/scnr/internal/safety"
 )
 
 const (

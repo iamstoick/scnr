@@ -32,6 +32,10 @@ type Dialer struct {
 	// link-local address (E_ENDPOINT_PRIVATE). Set by the cloud endpoint
 	// client: API traffic to a vendor must land in public address space.
 	RefusePrivate bool
+	// RefuseRedirects makes the HTTP client never follow redirects
+	// (ErrUseLastResponse): the caller sees the 3xx response instead.
+	// Set for the daemon notify client, which must not be steered.
+	RefuseRedirects bool
 
 	pins *pinSet
 }
@@ -50,7 +54,7 @@ type pinSet struct {
 // with a different connect timeout.
 func (d *Dialer) WithTimeout(t time.Duration) *Dialer {
 	d.ensurePins()
-	return &Dialer{Scope: d.Scope, Resolver: d.Resolver, Limits: d.Limits, Timeout: t, RequireAllow: d.RequireAllow, RefusePrivate: d.RefusePrivate, pins: d.pins}
+	return &Dialer{Scope: d.Scope, Resolver: d.Resolver, Limits: d.Limits, Timeout: t, RequireAllow: d.RequireAllow, RefusePrivate: d.RefusePrivate, RefuseRedirects: d.RefuseRedirects, pins: d.pins}
 }
 
 func (d *Dialer) ensurePins() {
@@ -268,6 +272,9 @@ func NewHTTPClient(d *Dialer, o HTTPOptions) *http.Client {
 		Timeout:   o.Timeout,
 		Transport: &limitedTransport{rt: tr, dialer: d, ua: o.UserAgent},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if d.RefuseRedirects {
+				return http.ErrUseLastResponse
+			}
 			if len(via) >= MaxRedirects {
 				return fmt.Errorf("stopped after %d redirects", MaxRedirects)
 			}

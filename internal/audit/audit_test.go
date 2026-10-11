@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gerald/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/store"
 )
 
 func TestLogWritesStoreAndMirror(t *testing.T) {

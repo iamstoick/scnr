@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gerald/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/domain"
 )
 
 // Exposure of the asset a finding belongs to.

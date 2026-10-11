@@ -12,7 +12,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/gerald/scnr/internal/engine"
+	"github.com/iamstoick/scnr/internal/engine"
 )
 
 // Caps for structured lockfiles. Anything beyond is treated as malformed:

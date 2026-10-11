@@ -9,7 +9,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/gerald/scnr/internal/engine"
+	"github.com/iamstoick/scnr/internal/engine"
 )
 
 var k8sRuleIDs = []string{"iac.k8s.privileged", "iac.k8s.host-namespace", "iac.k8s.no-resource-limits", "iac.k8s.run-as-root", "iac.k8s.secret-in-env"}

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gerald/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/domain"
 )
 
 func TestPolicyParseAndEvaluate(t *testing.T) {

@@ -19,8 +19,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/engine"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/engine"
 )
 
 // ToolInfo is the result of Detect.

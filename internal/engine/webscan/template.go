@@ -16,8 +16,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/engine"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/engine"
 )
 
 // Template limits (Section 5.4 and 9 "hostile inputs").

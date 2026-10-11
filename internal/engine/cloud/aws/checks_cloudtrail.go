@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 
-	"github.com/gerald/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/domain"
 )
 
 // checkCloudTrail: no trail at all, trails that are single-region, without

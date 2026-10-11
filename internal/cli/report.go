@@ -6,8 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/gerald/scnr/internal/report"
-	"github.com/gerald/scnr/internal/vulndb"
+	"github.com/iamstoick/scnr/internal/report"
+	"github.com/iamstoick/scnr/internal/vulndb"
 )
 
 func (a *App) reportCmd() *cobra.Command {

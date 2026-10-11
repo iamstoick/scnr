@@ -12,10 +12,10 @@ import (
 
 	"github.com/charmbracelet/huh"
 
-	"github.com/gerald/scnr/internal/config"
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/engine"
-	"github.com/gerald/scnr/internal/target"
+	"github.com/iamstoick/scnr/internal/config"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/engine"
+	"github.com/iamstoick/scnr/internal/target"
 )
 
 // ScanRequest is everything `scnr scan` needs; every field maps to a flag.
@@ -44,6 +44,9 @@ type ScanRequest struct {
 	Baseline  string // --baseline baseline.yaml
 	Diff      string // --diff latest|SCAN-ID
 	Templates string // --templates DIR
+	// Schedule names the schedule running this scan. Set by the daemon
+	// only; it is recorded on scans.meta and never comes from a flag.
+	Schedule string
 }
 
 // Flags renders the request as a reproducible command line.

@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/store"
 )
 
 // fakeResolver maps hostnames to address lists; answers can be changed

@@ -11,27 +11,29 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gerald/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/store"
 )
 
 // Actions recorded (Section 9).
 const (
-	ActionScan          = "scan"
-	ActionGateRefused   = "gate_refused"
-	ActionAccept        = "accept"
-	ActionVerify        = "verify"
-	ActionDBUpdate      = "db_update"
-	ActionLimitOverride = "limit_override"
-	ActionScopeInit     = "scope_init"
-	ActionMigrateDown   = "db_migrate_down"
-	ActionAcceptRevoke  = "accept_revoke"
-	ActionAcceptExpired = "accept_expired"
-	ActionBaseline      = "baseline"
-	ActionPolicyCheck   = "policy_check"
-	ActionSBOM          = "sbom"
-	ActionKeygen        = "db_keygen"
-	ActionBundleBuild   = "db_bundle_build"
-	ActionBundleVerify  = "db_bundle_verify"
+	ActionScan            = "scan"
+	ActionGateRefused     = "gate_refused"
+	ActionAccept          = "accept"
+	ActionVerify          = "verify"
+	ActionDBUpdate        = "db_update"
+	ActionLimitOverride   = "limit_override"
+	ActionScopeInit       = "scope_init"
+	ActionMigrateDown     = "db_migrate_down"
+	ActionAcceptRevoke    = "accept_revoke"
+	ActionAcceptExpired   = "accept_expired"
+	ActionBaseline        = "baseline"
+	ActionPolicyCheck     = "policy_check"
+	ActionSBOM            = "sbom"
+	ActionKeygen          = "db_keygen"
+	ActionBundleBuild     = "db_bundle_build"
+	ActionBundleVerify    = "db_bundle_verify"
+	ActionSchedule        = "schedule"
+	ActionScheduleSkipped = "schedule_skipped"
 )
 
 // Writer appends audit entries.

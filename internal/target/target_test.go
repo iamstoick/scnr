@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/engine/image/imagetest"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/engine/image/imagetest"
 )
 
 type fakeResolver map[string][]string

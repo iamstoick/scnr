@@ -11,7 +11,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/gerald/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/domain"
 )
 
 // Policy is policy.yaml (Section 5.8): CI gating rules evaluated over the

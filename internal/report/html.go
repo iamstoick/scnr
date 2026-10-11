@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/risk"
-	"github.com/gerald/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/risk"
+	"github.com/iamstoick/scnr/internal/store"
 )
 
 //go:embed html/*.tmpl html/*.css

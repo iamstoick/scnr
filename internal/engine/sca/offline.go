@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/mod/semver"
 
-	"github.com/gerald/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/store"
 )
 
 // OfflineStore is the store subset the offline matcher reads.

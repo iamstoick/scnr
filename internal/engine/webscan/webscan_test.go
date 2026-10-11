@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/engine"
-	"github.com/gerald/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/engine"
+	"github.com/iamstoick/scnr/internal/safety"
 )
 
 const goodTemplate = `id: my-check

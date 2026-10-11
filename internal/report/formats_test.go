@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/jsonschema"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/jsonschema"
 )
 
 // Acceptance 2.3: SARIF output validates against the 2.1.0 schema in testdata.

@@ -19,10 +19,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gerald/scnr/internal/engine/sca"
-	"github.com/gerald/scnr/internal/safety"
-	"github.com/gerald/scnr/internal/store"
-	"github.com/gerald/scnr/internal/vulndb/vulndbtest"
+	"github.com/iamstoick/scnr/internal/engine/sca"
+	"github.com/iamstoick/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/vulndb/vulndbtest"
 )
 
 // rawEntry is a tar entry a test controls completely (hostile names,

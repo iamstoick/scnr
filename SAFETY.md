@@ -73,7 +73,9 @@ These invariants are enforced in code and tests, not by policy alone.
    `epss.cyentia.com` with its redirect target `epss.empiricalsecurity.com`
    (only during `scnr db update`), and
    `osv-vulnerabilities.storage.googleapis.com` (only during `scnr db
-   bundle build`). Every one of them goes through `safety.NewEndpointClient`,
+   bundle build`), and the daemon's `--notify-url` (only `scnr daemon run`
+   with the flag set; pinned to that single host, redirects never
+   followed). Every one of them goes through `safety.NewEndpointClient`,
    whose fixed host allowlist refuses any other destination, private
    addresses and redirects included. A component handed no client fails
    with "no HTTP client" rather than falling back to `http.DefaultClient`.
@@ -280,3 +282,21 @@ These invariants are enforced in code and tests, not by policy alone.
     identity confirmation and no target type in this version, so prowler
     is not run for them. HTTP proxies are not used for cloud API traffic
     (a proxy host would fail the endpoint allowlist, closed).
+18. **Scheduled scans run unattended under manual-scan rules.** Stored argv
+    must start with `scan`, name a target, and pass the real scan flagset
+    (unknown flags fail); `--ack-authorized`, `--header`, `--cookie` and
+    `--non-interactive` are refused by presence, and credential-bearing
+    target URLs are refused without DNS. The daemon re-validates the stored
+    argv before every run, forces non-interactive with no consent func (a
+    TTY changes nothing), re-reads the scope file per run (broken file:
+    run skipped and audited, daemon continues), rebuilds credentials per
+    run, and runs one scan at a time behind a home lock (a second daemon
+    exits 2). Schedules fire at most hourly; a fire missed while its own
+    scan runs is skipped and audited (`schedule_skipped`), never burst.
+    Per-run timeouts bound every run; SIGINT/SIGTERM cancel the in-flight
+    scan, persist every row, and exit 0. Notify bodies carry counts and
+    metadata only (shape pinned by test); delivery retries 3 times, never
+    follows redirects, is denied metadata endpoints, and a token in the
+    URL reaches no error, log, or audit row.
+    *Residual:* schedules execute whatever argv passed validation at
+    add time — review stored rows (`schedule show`) like any automation.

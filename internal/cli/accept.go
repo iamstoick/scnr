@@ -11,8 +11,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/gerald/scnr/internal/audit"
-	"github.com/gerald/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/audit"
+	"github.com/iamstoick/scnr/internal/store"
 )
 
 var fingerprintRe = regexp.MustCompile(`^[a-f0-9]{64}$`)

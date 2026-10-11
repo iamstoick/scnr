@@ -16,11 +16,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/engine"
-	"github.com/gerald/scnr/internal/engine/image/imagetest"
-	"github.com/gerald/scnr/internal/engine/sca"
-	"github.com/gerald/scnr/internal/target"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/engine"
+	"github.com/iamstoick/scnr/internal/engine/image/imagetest"
+	"github.com/iamstoick/scnr/internal/engine/sca"
+	"github.com/iamstoick/scnr/internal/target"
 )
 
 const fixtureTar = "../../../testdata/image/alpine-small.tar"

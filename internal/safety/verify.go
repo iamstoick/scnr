@@ -17,8 +17,8 @@ import (
 
 	"golang.org/x/net/publicsuffix"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/store"
 )
 
 // Verification constants (Section 9).

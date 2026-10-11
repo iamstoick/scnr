@@ -3,7 +3,7 @@ package image
 import (
 	"strings"
 
-	"github.com/gerald/scnr/internal/engine/sca"
+	"github.com/iamstoick/scnr/internal/engine/sca"
 )
 
 // Paths inside an image root (no leading slash) that the engine collects.

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gerald/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/domain"
 )
 
 // runScan records a scan whose findings are the given rule IDs on one asset.

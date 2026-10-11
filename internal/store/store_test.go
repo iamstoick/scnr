@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gerald/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/domain"
 )
 
 func openTest(t *testing.T) *Store {
@@ -360,7 +360,8 @@ func TestOfflineLoadStagesAndRollsBack(t *testing.T) {
 		t.Fatalf("double commit: %v", err)
 	}
 	// Down migration removes the table and its meta row; up restores it empty.
-	if err := s.MigrateDown(ctx, 1, false); err != nil {
+	// Two steps: 0004 (schedules, unrelated) must fall before 0003 (osv offline).
+	if err := s.MigrateDown(ctx, 2, false); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Migrate(ctx); err != nil {

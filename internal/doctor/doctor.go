@@ -15,10 +15,10 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/gerald/scnr/internal/adapter"
-	"github.com/gerald/scnr/internal/config"
-	"github.com/gerald/scnr/internal/store"
-	"github.com/gerald/scnr/internal/vulndb"
+	"github.com/iamstoick/scnr/internal/adapter"
+	"github.com/iamstoick/scnr/internal/config"
+	"github.com/iamstoick/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/vulndb"
 )
 
 // Status values.

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gerald/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/domain"
 )
 
 // BatchSize is the number of findings written per transaction.

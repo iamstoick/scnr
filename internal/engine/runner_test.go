@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gerald/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/domain"
 )
 
 type fakeEngine struct {

@@ -9,8 +9,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/gerald/scnr/internal/safety"
-	"github.com/gerald/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/store"
 )
 
 // Record is one line of an offline bundle's affected/<eco>.jsonl: a

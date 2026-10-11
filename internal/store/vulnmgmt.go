@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gerald/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/domain"
 )
 
 // This file holds the vulnerability-management queries: scan diff, the

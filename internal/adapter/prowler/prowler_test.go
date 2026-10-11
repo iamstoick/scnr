@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gerald/scnr/internal/adapter"
-	"github.com/gerald/scnr/internal/adapter/adaptertest"
-	"github.com/gerald/scnr/internal/config"
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/engine"
-	cloudaws "github.com/gerald/scnr/internal/engine/cloud/aws"
+	"github.com/iamstoick/scnr/internal/adapter"
+	"github.com/iamstoick/scnr/internal/adapter/adaptertest"
+	"github.com/iamstoick/scnr/internal/config"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/engine"
+	cloudaws "github.com/iamstoick/scnr/internal/engine/cloud/aws"
 )
 
 const account = "123456789012"

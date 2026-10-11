@@ -16,7 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 
-	"github.com/gerald/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/safety"
 )
 
 // Credential source labels (safety.CloudIdentity.Source).

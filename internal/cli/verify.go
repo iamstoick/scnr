@@ -6,8 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/gerald/scnr/internal/audit"
-	"github.com/gerald/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/audit"
+	"github.com/iamstoick/scnr/internal/safety"
 )
 
 func (a *App) verifyCmd() *cobra.Command {

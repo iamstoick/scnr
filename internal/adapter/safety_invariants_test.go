@@ -12,17 +12,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gerald/scnr/internal/adapter"
-	"github.com/gerald/scnr/internal/adapter/grype"
-	"github.com/gerald/scnr/internal/adapter/nmap"
-	"github.com/gerald/scnr/internal/adapter/nuclei"
-	"github.com/gerald/scnr/internal/adapter/prowler"
-	"github.com/gerald/scnr/internal/adapter/semgrep"
-	"github.com/gerald/scnr/internal/adapter/trivy"
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/engine"
-	"github.com/gerald/scnr/internal/engine/image"
-	"github.com/gerald/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/adapter"
+	"github.com/iamstoick/scnr/internal/adapter/grype"
+	"github.com/iamstoick/scnr/internal/adapter/nmap"
+	"github.com/iamstoick/scnr/internal/adapter/nuclei"
+	"github.com/iamstoick/scnr/internal/adapter/prowler"
+	"github.com/iamstoick/scnr/internal/adapter/semgrep"
+	"github.com/iamstoick/scnr/internal/adapter/trivy"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/engine"
+	"github.com/iamstoick/scnr/internal/engine/image"
+	"github.com/iamstoick/scnr/internal/safety"
 )
 
 // TestNoForbiddenFlagLiteralsInAdapterSources inspects every non-test Go

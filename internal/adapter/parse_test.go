@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/safety"
 )
 
 func TestStreamArray(t *testing.T) {

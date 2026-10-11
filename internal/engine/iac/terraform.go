@@ -12,7 +12,7 @@ import (
 	"github.com/zclconf/go-cty/cty/function"
 	"github.com/zclconf/go-cty/cty/function/stdlib"
 
-	"github.com/gerald/scnr/internal/engine"
+	"github.com/iamstoick/scnr/internal/engine"
 )
 
 var terraformRuleIDs = []string{

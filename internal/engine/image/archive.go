@@ -16,9 +16,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gerald/scnr/internal/engine/sca"
-	"github.com/gerald/scnr/internal/safety"
-	"github.com/gerald/scnr/internal/target"
+	"github.com/iamstoick/scnr/internal/engine/sca"
+	"github.com/iamstoick/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/target"
 )
 
 // Limits bound what the engine will read from an image. The tarball is

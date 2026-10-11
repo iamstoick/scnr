@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gerald/scnr/internal/adapter/adaptertest"
-	"github.com/gerald/scnr/internal/jsonschema"
+	"github.com/iamstoick/scnr/internal/adapter/adaptertest"
+	"github.com/iamstoick/scnr/internal/jsonschema"
 )
 
 // copyToFlag returns a fake-binary body that copies file to the path given

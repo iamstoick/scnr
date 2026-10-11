@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/gerald/scnr/internal/doctor"
-	cloudaws "github.com/gerald/scnr/internal/engine/cloud/aws"
+	"github.com/iamstoick/scnr/internal/doctor"
+	cloudaws "github.com/iamstoick/scnr/internal/engine/cloud/aws"
+	"github.com/iamstoick/scnr/internal/sched"
 )
 
 func (a *App) doctorCmd() *cobra.Command {
@@ -32,7 +34,7 @@ func (a *App) doctorCmd() *cobra.Command {
 			for _, ad := range adapters {
 				detectors[ad.Binary()] = ad
 			}
-			opts := doctor.Options{Home: a.Home, ConfigPath: a.ConfigPath, Store: a.Store, Online: online, Adapters: detectors, Extra: a.cloudChecks(cmd.Context())}
+			opts := doctor.Options{Home: a.Home, ConfigPath: a.ConfigPath, Store: a.Store, Online: online, Adapters: detectors, Extra: append(a.cloudChecks(cmd.Context()), a.daemonChecks(cmd.Context())...)}
 			if online {
 				// Reachability probes go through the same endpoint-restricted
 				// client as the real fetches (SAFETY.md item 9).
@@ -83,6 +85,40 @@ func (a *App) cloudChecks(ctx context.Context) []doctor.Check {
 	}
 	if cfg.InstanceCredentials {
 		out = append(out, doctor.Check{Name: "aws instance credentials", Status: doctor.Warn, Detail: "enabled: IMDS/ECS credential endpoints may be contacted (audited as limit_override)"})
+	}
+	return out
+}
+
+// daemonChecks reports the daemon lock state and the schedules due in the
+// next 24 hours.
+func (a *App) daemonChecks(ctx context.Context) []doctor.Check {
+	running, pid := sched.LockState(a.Home)
+	lock := doctor.Check{Name: "daemon", Status: doctor.OK, Detail: "not running"}
+	if running {
+		lock.Detail = fmt.Sprintf("running (pid %d)", pid)
+	}
+	out := []doctor.Check{lock}
+	if a.Store == nil {
+		return out
+	}
+	rows, err := a.Store.ListSchedules(ctx)
+	if err != nil {
+		return append(out, doctor.Check{Name: "schedules", Status: doctor.Warn, Detail: err.Error()})
+	}
+	horizon := time.Now().Add(24 * time.Hour)
+	var due []string
+	for _, s := range rows {
+		if s.Enabled && !s.NextRun.After(horizon) {
+			due = append(due, s.Name+" @ "+s.NextRun.Format(time.RFC3339))
+		}
+	}
+	switch {
+	case len(rows) == 0:
+		out = append(out, doctor.Check{Name: "schedules", Status: doctor.OK, Detail: "none stored"})
+	case len(due) == 0:
+		out = append(out, doctor.Check{Name: "schedules", Status: doctor.OK, Detail: fmt.Sprintf("%d stored, none due in 24h", len(rows))})
+	default:
+		out = append(out, doctor.Check{Name: "schedules", Status: doctor.OK, Detail: fmt.Sprintf("%d due in 24h: %s", len(due), strings.Join(due, ", "))})
 	}
 	return out
 }

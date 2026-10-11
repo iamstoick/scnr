@@ -12,12 +12,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/gerald/scnr/internal/adapter/adaptertest"
-	"github.com/gerald/scnr/internal/audit"
-	"github.com/gerald/scnr/internal/domain"
-	cloudaws "github.com/gerald/scnr/internal/engine/cloud/aws"
-	"github.com/gerald/scnr/internal/engine/cloud/aws/awstest"
-	"github.com/gerald/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/adapter/adaptertest"
+	"github.com/iamstoick/scnr/internal/audit"
+	"github.com/iamstoick/scnr/internal/domain"
+	cloudaws "github.com/iamstoick/scnr/internal/engine/cloud/aws"
+	"github.com/iamstoick/scnr/internal/engine/cloud/aws/awstest"
+	"github.com/iamstoick/scnr/internal/store"
 )
 
 // Fake credential material, built by concatenation so no scanner (ours or

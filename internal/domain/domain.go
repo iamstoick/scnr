@@ -228,6 +228,8 @@ type Scan struct {
 	Partial       bool          `json:"partial"`
 	Posture       PostureScore  `json:"posture"`
 	ExitCode      int           `json:"exit_code"`
+	// Schedule names the schedule that ran this scan (daemon only).
+	Schedule string `json:"schedule,omitempty"`
 }
 
 // Safety values a Rule may carry. There is deliberately no third value.

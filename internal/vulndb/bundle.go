@@ -20,10 +20,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gerald/scnr/internal/adapter"
-	"github.com/gerald/scnr/internal/engine/sca"
-	"github.com/gerald/scnr/internal/safety"
-	"github.com/gerald/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/adapter"
+	"github.com/iamstoick/scnr/internal/engine/sca"
+	"github.com/iamstoick/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/store"
 )
 
 // Bundle format constants (Phase 4a). A bundle is a trust decision, not a

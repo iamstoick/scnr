@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gerald/scnr/internal/engine/sca"
+	"github.com/iamstoick/scnr/internal/engine/sca"
 )
 
 // Builder constants.

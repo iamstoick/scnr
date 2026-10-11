@@ -553,7 +553,7 @@ Hot paths: port scanning (bounded by `Limits`, connect-only, 2 s timeouts, no re
 
 ### Open questions (recommended default in bold)
 
-1. Go module path / repository org? **`github.com/gerald/scnr`** until a home is chosen; only `go.mod` and imports change.
+1. Go module path / repository org? **`github.com/iamstoick/scnr`** until a home is chosen; only `go.mod` and imports change.
 2. License? **Apache-2.0** (matches trivy/grype; permits enterprise adoption; patent grant).
 3. Should SCA contact osv.dev by default, or require `--online`? **Default on, with a one-time wizard disclosure and `--offline` to disable**; otherwise the MVP has no useful SCA.
 4. Non-interactive scans of bare public IPs with no DNS name and no HTTP: refuse, or allow if the IP is in `allow`? **Refuse** (`E_OWNERSHIP_REQUIRED`); the allow list alone is not proof of ownership.

@@ -11,33 +11,34 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
-	"github.com/gerald/scnr/internal/adapter"
-	"github.com/gerald/scnr/internal/adapter/grype"
-	"github.com/gerald/scnr/internal/adapter/nmap"
-	"github.com/gerald/scnr/internal/adapter/nuclei"
-	"github.com/gerald/scnr/internal/adapter/prowler"
-	"github.com/gerald/scnr/internal/adapter/semgrep"
-	"github.com/gerald/scnr/internal/adapter/trivy"
-	"github.com/gerald/scnr/internal/audit"
-	"github.com/gerald/scnr/internal/config"
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/engine"
-	cloudaws "github.com/gerald/scnr/internal/engine/cloud/aws"
-	"github.com/gerald/scnr/internal/engine/codecheck"
-	"github.com/gerald/scnr/internal/engine/iac"
-	"github.com/gerald/scnr/internal/engine/image"
-	"github.com/gerald/scnr/internal/engine/netscan"
-	"github.com/gerald/scnr/internal/engine/sca"
-	"github.com/gerald/scnr/internal/engine/secrets"
-	"github.com/gerald/scnr/internal/engine/webscan"
-	"github.com/gerald/scnr/internal/report"
-	"github.com/gerald/scnr/internal/risk"
-	"github.com/gerald/scnr/internal/safety"
-	"github.com/gerald/scnr/internal/store"
-	"github.com/gerald/scnr/internal/target"
-	"github.com/gerald/scnr/internal/vulndb"
-	"github.com/gerald/scnr/internal/wizard"
+	"github.com/iamstoick/scnr/internal/adapter"
+	"github.com/iamstoick/scnr/internal/adapter/grype"
+	"github.com/iamstoick/scnr/internal/adapter/nmap"
+	"github.com/iamstoick/scnr/internal/adapter/nuclei"
+	"github.com/iamstoick/scnr/internal/adapter/prowler"
+	"github.com/iamstoick/scnr/internal/adapter/semgrep"
+	"github.com/iamstoick/scnr/internal/adapter/trivy"
+	"github.com/iamstoick/scnr/internal/audit"
+	"github.com/iamstoick/scnr/internal/config"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/engine"
+	cloudaws "github.com/iamstoick/scnr/internal/engine/cloud/aws"
+	"github.com/iamstoick/scnr/internal/engine/codecheck"
+	"github.com/iamstoick/scnr/internal/engine/iac"
+	"github.com/iamstoick/scnr/internal/engine/image"
+	"github.com/iamstoick/scnr/internal/engine/netscan"
+	"github.com/iamstoick/scnr/internal/engine/sca"
+	"github.com/iamstoick/scnr/internal/engine/secrets"
+	"github.com/iamstoick/scnr/internal/engine/webscan"
+	"github.com/iamstoick/scnr/internal/report"
+	"github.com/iamstoick/scnr/internal/risk"
+	"github.com/iamstoick/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/target"
+	"github.com/iamstoick/scnr/internal/vulndb"
+	"github.com/iamstoick/scnr/internal/wizard"
 )
 
 func (a *App) scanCmd() *cobra.Command {
@@ -67,12 +68,20 @@ func (a *App) scanCmd() *cobra.Command {
 			return nil
 		},
 	}
-	f := cmd.Flags()
+	scanFlags(cmd.Flags(), &req, &engines, &skip, "./scnr-out")
+	cmd.AddCommand(a.scanListCmds()...)
+	return cmd
+}
+
+// scanFlags registers the scan flags on f. outDefault is the --out default:
+// the CLI passes ./scnr-out; schedule parsing passes "" so the daemon can
+// apply its own --out when the stored argv sets none.
+func scanFlags(f *pflag.FlagSet, req *wizard.ScanRequest, engines, skip *string, outDefault string) {
 	f.StringVar(&req.Profile, "profile", "standard", "quick|standard|deep")
 	f.StringVar(&req.Type, "type", "", "override target detection: url|host|cidr|path|image|cloud (a directory is read as an OCI image layout only with --type image)")
-	f.StringVar(&engines, "engines", "", "only run these engines (comma list)")
-	f.StringVar(&skip, "skip-engines", "", "skip these engines (comma list)")
-	f.StringVar(&req.Out, "out", "./scnr-out", "output directory (reports go in <out>/<scan-id>/)")
+	f.StringVar(engines, "engines", "", "only run these engines (comma list)")
+	f.StringVar(skip, "skip-engines", "", "skip these engines (comma list)")
+	f.StringVar(&req.Out, "out", outDefault, "output directory (reports go in <out>/<scan-id>/)")
 	f.StringVar(&req.Formats, "format", "html,json", "report formats (comma list)")
 	f.BoolVar(&req.NonInteractive, "non-interactive", false, "never prompt; refuse anything needing consent")
 	f.BoolVar(&req.Offline, "offline", false, "do not contact osv.dev; SCA uses the loaded offline bundle (scnr db update --offline-bundle) or is skipped")
@@ -87,8 +96,6 @@ func (a *App) scanCmd() *cobra.Command {
 	f.StringVar(&req.Baseline, "baseline", "", "baseline.yaml whose findings are reported as suppressed")
 	f.StringVar(&req.Diff, "diff", "", "print new/fixed findings vs a previous scan: latest|SCAN-ID")
 	f.StringVar(&req.Templates, "templates", "", "directory of extra webscan templates (validated, safe only)")
-	cmd.AddCommand(a.scanListCmds()...)
-	return cmd
 }
 
 // engines bundles the registry with the engines RunScan wires elsewhere.
@@ -397,7 +404,8 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 	scan := &domain.Scan{
 		ID: domain.NewID(), StartedAt: time.Now(), Profile: profile.Name, Targets: targets,
 		TargetSetHash: domain.TargetSetHash(targets), ScopeHash: scope.Hash(),
-		Consent: domain.ConsentRecord{Method: consentMethod, By: audit.Actor(), At: time.Now()},
+		Consent:  domain.ConsentRecord{Method: consentMethod, By: audit.Actor(), At: time.Now()},
+		Schedule: req.Schedule,
 	}
 	if err := a.Store.InsertScan(ctx, scan); err != nil {
 		return nil, ExitUsage, err

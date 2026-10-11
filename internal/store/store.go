@@ -17,7 +17,7 @@ import (
 
 	_ "modernc.org/sqlite" // pure-Go driver
 
-	"github.com/gerald/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/domain"
 )
 
 //go:embed migrations/*.sql
@@ -256,10 +256,14 @@ func (s *Store) InsertScan(ctx context.Context, sc *domain.Scan) error {
 }
 
 func (s *Store) insertScan(ctx context.Context, tx *sql.Tx, sc *domain.Scan) error {
+	meta := map[string]any{"consent_at": sc.Consent.At}
+	if sc.Schedule != "" {
+		meta["schedule"] = sc.Schedule
+	}
 	_, err := tx.ExecContext(ctx, `INSERT INTO scans(id, started_at, profile, target_set_hash, scope_hash, consent_method, consent_by, partial, meta)
 		VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`,
 		sc.ID, fmtTime(sc.StartedAt), sc.Profile, sc.TargetSetHash, sc.ScopeHash, sc.Consent.Method, sc.Consent.By,
-		marshalJSON(map[string]any{"consent_at": sc.Consent.At}))
+		marshalJSON(meta))
 	if err != nil {
 		return fmt.Errorf("insert scan: %w", err)
 	}
@@ -307,13 +311,20 @@ func (s *Store) GetScan(ctx context.Context, id string) (*domain.Scan, error) {
 	var started, finished, grade sql.NullString
 	var partial int
 	var score, exit sql.NullInt64
-	err := s.db.QueryRowContext(ctx, `SELECT started_at, finished_at, profile, target_set_hash, scope_hash, consent_method, consent_by, partial, score, grade, exit_code FROM scans WHERE id = ?`, id).
-		Scan(&started, &finished, &sc.Profile, &sc.TargetSetHash, &sc.ScopeHash, &sc.Consent.Method, &sc.Consent.By, &partial, &score, &grade, &exit)
+	var meta sql.NullString
+	err := s.db.QueryRowContext(ctx, `SELECT started_at, finished_at, profile, target_set_hash, scope_hash, consent_method, consent_by, partial, score, grade, exit_code, meta FROM scans WHERE id = ?`, id).
+		Scan(&started, &finished, &sc.Profile, &sc.TargetSetHash, &sc.ScopeHash, &sc.Consent.Method, &sc.Consent.By, &partial, &score, &grade, &exit, &meta)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
+	}
+	if meta.Valid {
+		var m map[string]any
+		if err := json.Unmarshal([]byte(meta.String), &m); err == nil {
+			sc.Schedule, _ = m["schedule"].(string)
+		}
 	}
 	sc.StartedAt = parseTime(started.String)
 	sc.FinishedAt = parseTime(finished.String)

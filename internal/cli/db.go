@@ -12,10 +12,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/gerald/scnr/internal/audit"
-	"github.com/gerald/scnr/internal/safety"
-	"github.com/gerald/scnr/internal/store"
-	"github.com/gerald/scnr/internal/vulndb"
+	"github.com/iamstoick/scnr/internal/audit"
+	"github.com/iamstoick/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/vulndb"
 )
 
 func (a *App) dbCmd() *cobra.Command {

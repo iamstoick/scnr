@@ -12,7 +12,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gerald/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/domain"
 )
 
 // Error codes surfaced to users (exit 3 for gate refusals).

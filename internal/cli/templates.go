@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/gerald/scnr/internal/engine/webscan"
+	"github.com/iamstoick/scnr/internal/engine/webscan"
 )
 
 func (a *App) templatesCmd() *cobra.Command {

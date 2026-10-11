@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/sync/semaphore"
 
-	"github.com/gerald/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/domain"
 )
 
 // Progress is called when an engine starts and finishes.

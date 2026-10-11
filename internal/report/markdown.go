@@ -8,10 +8,10 @@ import (
 	"io"
 	"strings"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/risk"
-	"github.com/gerald/scnr/internal/safety"
-	"github.com/gerald/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/risk"
+	"github.com/iamstoick/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/store"
 )
 
 // MarkdownMaxRows bounds the findings table (PR comments have size limits).

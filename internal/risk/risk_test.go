@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gerald/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/domain"
 )
 
 func fp(v float64) *float64 { return &v }

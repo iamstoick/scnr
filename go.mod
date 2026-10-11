@@ -1,4 +1,4 @@
-module github.com/gerald/scnr
+module github.com/iamstoick/scnr
 
 go 1.26.0
 
@@ -21,6 +21,7 @@ require (
 	github.com/charmbracelet/huh v0.7.0
 	github.com/hashicorp/hcl/v2 v2.24.0
 	github.com/package-url/packageurl-go v0.1.7
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/zclconf/go-cty v1.16.3

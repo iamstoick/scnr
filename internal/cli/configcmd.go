@@ -8,9 +8,9 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/gerald/scnr/internal/config"
-	cloudaws "github.com/gerald/scnr/internal/engine/cloud/aws"
-	"github.com/gerald/scnr/internal/risk"
+	"github.com/iamstoick/scnr/internal/config"
+	cloudaws "github.com/iamstoick/scnr/internal/engine/cloud/aws"
+	"github.com/iamstoick/scnr/internal/risk"
 )
 
 func (a *App) configCmd() *cobra.Command {

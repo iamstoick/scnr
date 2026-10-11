@@ -12,9 +12,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/safety"
-	"github.com/gerald/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/store"
 )
 
 // SchemaVersion of the JSON report (the public contract).

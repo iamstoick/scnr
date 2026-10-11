@@ -20,8 +20,8 @@ import (
 	"github.com/aws/smithy-go/middleware"
 	"golang.org/x/time/rate"
 
-	"github.com/gerald/scnr/internal/engine"
-	"github.com/gerald/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/engine"
+	"github.com/iamstoick/scnr/internal/safety"
 )
 
 // Transport and retry constants (spec 3.3).

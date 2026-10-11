@@ -10,9 +10,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/engine/sca"
-	"github.com/gerald/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/engine/sca"
+	"github.com/iamstoick/scnr/internal/safety"
 )
 
 // StreamArray decodes a top-level JSON object and calls fn once per element

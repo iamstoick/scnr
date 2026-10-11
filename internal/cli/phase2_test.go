@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gerald/scnr/internal/adapter/adaptertest"
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/adapter/adaptertest"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/store"
 )
 
 func webTarget(t *testing.T) *httptest.Server {

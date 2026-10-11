@@ -10,8 +10,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/safety"
 )
 
 // Options are passed to every engine for a scan.

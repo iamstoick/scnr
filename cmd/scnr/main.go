@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/gerald/scnr/internal/cli"
+	"github.com/iamstoick/scnr/internal/cli"
 )
 
 // version is set by the release build (-ldflags "-X main.version=...").

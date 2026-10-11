@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gerald/scnr/internal/adapter"
-	"github.com/gerald/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/adapter"
+	"github.com/iamstoick/scnr/internal/store"
 )
 
 func TestRunChecks(t *testing.T) {

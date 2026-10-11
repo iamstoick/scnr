@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gerald/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/safety"
 )
 
 func TestRedactingHandler(t *testing.T) {

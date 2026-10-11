@@ -8,13 +8,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/gerald/scnr/internal/audit"
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/engine/image"
-	"github.com/gerald/scnr/internal/engine/sca"
-	"github.com/gerald/scnr/internal/safety"
-	"github.com/gerald/scnr/internal/sbom"
-	"github.com/gerald/scnr/internal/target"
+	"github.com/iamstoick/scnr/internal/audit"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/engine/image"
+	"github.com/iamstoick/scnr/internal/engine/sca"
+	"github.com/iamstoick/scnr/internal/safety"
+	"github.com/iamstoick/scnr/internal/sbom"
+	"github.com/iamstoick/scnr/internal/target"
 )
 
 func (a *App) sbomCmd() *cobra.Command {

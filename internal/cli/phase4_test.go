@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gerald/scnr/internal/vulndb/vulndbtest"
+	"github.com/iamstoick/scnr/internal/vulndb/vulndbtest"
 )
 
 // keygenAndTrust runs `db keygen`, writes a scnr.yaml that acknowledges

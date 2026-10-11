@@ -110,6 +110,28 @@ func TestEndpointClientAllowlist(t *testing.T) {
 	}
 }
 
+// RefuseRedirects (daemon notify class): any redirect returns
+// ErrUseLastResponse, so the caller sees the 3xx response instead of
+// following it — even to an in-scope host.
+func TestEndpointRefuseRedirects(t *testing.T) {
+	via := []*http.Request{{URL: mustURL(t, "http://127.0.0.1/hook")}}
+	to := &http.Request{Method: "POST", URL: mustURL(t, "http://127.0.0.1/other")}
+	refusing, err := NewEndpointClientPolicy([]string{"127.0.0.1"}, HTTPOptions{}, EndpointPolicy{RefuseRedirects: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := refusing.CheckRedirect(to, via); err != http.ErrUseLastResponse {
+		t.Fatalf("redirect: %v", err)
+	}
+	following, err := NewEndpointClientPolicy([]string{"127.0.0.1"}, HTTPOptions{}, EndpointPolicy{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := following.CheckRedirect(to, via); err != nil {
+		t.Fatalf("in-scope redirect refused without the policy: %v", err)
+	}
+}
+
 func mustURL(t *testing.T, raw string) *url.URL {
 	t.Helper()
 	u, err := url.Parse(raw)

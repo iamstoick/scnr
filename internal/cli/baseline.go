@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/gerald/scnr/internal/config"
+	"github.com/iamstoick/scnr/internal/config"
 )
 
 func (a *App) baselineCmd() *cobra.Command {

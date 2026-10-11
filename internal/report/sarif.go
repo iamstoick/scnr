@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gerald/scnr/internal/domain"
-	"github.com/gerald/scnr/internal/risk"
-	"github.com/gerald/scnr/internal/store"
+	"github.com/iamstoick/scnr/internal/domain"
+	"github.com/iamstoick/scnr/internal/risk"
+	"github.com/iamstoick/scnr/internal/store"
 )
 
 // SARIF 2.1.0 writer with own structs (no dependency). One run per engine;
@@ -306,7 +306,7 @@ func (s *SARIF) Write(ctx context.Context, it *store.FindingIterator, scan domai
 			driverName = "scnr/" + name
 		}
 		runs = append(runs, sarifRun{
-			Tool:              sarifTool{Driver: sarifDriver{Name: driverName, Version: firstNonEmpty(er.Version, s.Meta.Version), InformationURI: "https://github.com/gerald/scnr", Rules: acc.rules}},
+			Tool:              sarifTool{Driver: sarifDriver{Name: driverName, Version: firstNonEmpty(er.Version, s.Meta.Version), InformationURI: "https://github.com/iamstoick/scnr", Rules: acc.rules}},
 			AutomationDetails: &sarifAutomation{ID: "scnr/" + scan.ID + "/" + name},
 			Invocations: []sarifInvocation{{
 				ExecutionSuccessful: exit == 0, ExitCode: &exit, ExitCodeDescription: er.Status,
