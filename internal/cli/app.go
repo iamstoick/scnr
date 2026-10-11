@@ -72,7 +72,10 @@ type App struct {
 	KEVURL     string
 	EPSSURL    string
 	BundleBase string
-	Verbose    bool
+	// AWSEndpoint points every AWS service client at a fake (tests only);
+	// no flag sets it (TestCLIDoesNotExposeEndpointOverride).
+	AWSEndpoint string
+	Verbose     bool
 
 	configErr  error      // set when scnr.yaml exists but is invalid
 	progressMu sync.Mutex // serialises engine progress lines from concurrent engines

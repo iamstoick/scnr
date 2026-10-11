@@ -191,6 +191,9 @@ const (
 	ConsentWellKnown    = "well-known"
 	ConsentPrivateRange = "private-range"
 	ConsentLocal        = "local" // path targets: acknowledgment only
+	// ConsentCloudAllowlist: the confirmed cloud account id is listed in
+	// cloud.<provider>.accounts of the scope file.
+	ConsentCloudAllowlist = "cloud-allowlist"
 )
 
 // ConsentRecord says how authorisation for a scan was established.

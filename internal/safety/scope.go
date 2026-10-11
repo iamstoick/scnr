@@ -26,6 +26,11 @@ const (
 	CodeUnresolvable      = "E_UNRESOLVABLE"
 	CodeBundleUntrusted   = "E_BUNDLE_UNTRUSTED"
 	CodeBundleDowngrade   = "E_BUNDLE_DOWNGRADE"
+	// Phase 4b (cloud).
+	CodeEndpointPrivate        = "E_ENDPOINT_PRIVATE"
+	CodeCloudAccountNotAllowed = "E_CLOUD_ACCOUNT_NOT_ALLOWED"
+	CodeCloudCredentialSource  = "E_CLOUD_CREDENTIAL_SOURCE"
+	CodeCloudIdentity          = "E_CLOUD_IDENTITY"
 )
 
 // RefusalError is returned when the gate or a dial-time check refuses.
@@ -192,14 +197,24 @@ type Scope struct {
 
 // NewScope parses allow and deny entries. BuiltinDeny is always appended.
 func NewScope(allow, deny []string) (*Scope, error) {
+	return newScope(allow, deny, true)
+}
+
+// newScope is NewScope with the built-in deny list optional. The only
+// caller that passes builtin=false is the endpoint client for instance
+// credential lookups (EndpointPolicy.AllowMetadata); scan scopes always
+// carry it.
+func newScope(allow, deny []string, builtin bool) (*Scope, error) {
 	s := &Scope{}
-	for _, d := range BuiltinDeny {
-		e, err := parseEntry(d)
-		if err != nil {
-			return nil, err
+	if builtin {
+		for _, d := range BuiltinDeny {
+			e, err := parseEntry(d)
+			if err != nil {
+				return nil, err
+			}
+			e.raw = d + " (built-in)"
+			s.deny = append(s.deny, e)
 		}
-		e.raw = d + " (built-in)"
-		s.deny = append(s.deny, e)
 	}
 	for _, a := range allow {
 		e, err := parseEntry(a)

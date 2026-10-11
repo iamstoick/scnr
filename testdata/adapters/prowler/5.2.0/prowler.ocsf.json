@@ -1,0 +1,705 @@
+[
+ {
+  "metadata": {
+   "event_code": "iam_root_mfa_enabled",
+   "product": {
+    "name": "Prowler",
+    "version": "5.2.0",
+    "vendor_name": "Prowler"
+   },
+   "version": "1.3.0"
+  },
+  "severity_id": 5,
+  "severity": "Critical",
+  "status": "New",
+  "status_code": "FAIL",
+  "status_detail": "detail from prowler with Password: hunter2-not-real",
+  "status_id": 1,
+  "unmapped": {
+   "check_type": "",
+   "related_url": "",
+   "categories": [],
+   "depends_on": [],
+   "related_to": [],
+   "notes": "",
+   "compliance": {
+    "CIS-1.4": [
+     "1.5"
+    ]
+   }
+  },
+  "activity_name": "Create",
+  "activity_id": 1,
+  "finding_info": {
+   "created_time": 1700000000,
+   "desc": "long description Ensure MFA is enabled for the root account",
+   "product_uid": "prowler",
+   "title": "Ensure MFA is enabled for the root account",
+   "uid": "prowler-aws-iam_root_mfa_enabled-123456789012-us-east-1-<root_account>"
+  },
+  "resources": [
+   {
+    "cloud_partition": "aws",
+    "region": "us-east-1",
+    "data": {
+     "details": "",
+     "tags": {
+      "owner": "CANARY-TAG-VALUE"
+     }
+    },
+    "group": {
+     "name": "iam"
+    },
+    "labels": [],
+    "name": "<root_account>",
+    "type": "AwsIamUser",
+    "uid": "arn:aws:iam::123456789012:root"
+   }
+  ],
+  "category_name": "Findings",
+  "category_uid": 2,
+  "class_name": "Detection Finding",
+  "class_uid": 2004,
+  "cloud": {
+   "account": {
+    "name": "audit",
+    "type": "AWS_Account",
+    "type_id": 10,
+    "uid": "123456789012",
+    "labels": []
+   },
+   "org": {
+    "name": "",
+    "uid": ""
+   },
+   "provider": "aws",
+   "region": "us-east-1"
+  },
+  "event_time": 1700000000,
+  "remediation": {
+   "desc": "Using IAM console navigate to Dashboard and expand Activate MFA on your root account.",
+   "references": [
+    "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html#id_root-user_manage_mfa"
+   ]
+  },
+  "risk_details": "risk text",
+  "time": 1700000000,
+  "time_dt": "2023-11-14T22:13:20",
+  "type_uid": 200401,
+  "type_name": "Detection Finding: Create"
+ },
+ {
+  "metadata": {
+   "event_code": "s3_bucket_public_access",
+   "product": {
+    "name": "Prowler",
+    "version": "5.2.0",
+    "vendor_name": "Prowler"
+   },
+   "version": "1.3.0"
+  },
+  "severity_id": 5,
+  "severity": "Critical",
+  "status": "New",
+  "status_code": "FAIL",
+  "status_detail": "detail from prowler with Password: hunter2-not-real",
+  "status_id": 1,
+  "unmapped": {
+   "check_type": "",
+   "related_url": "",
+   "categories": [],
+   "depends_on": [],
+   "related_to": [],
+   "notes": "",
+   "compliance": {
+    "CIS-1.4": [
+     "1.5"
+    ]
+   }
+  },
+  "activity_name": "Create",
+  "activity_id": 1,
+  "finding_info": {
+   "created_time": 1700000000,
+   "desc": "long description Ensure there are no S3 buckets open to Everyone or Any AWS user.",
+   "product_uid": "prowler",
+   "title": "Ensure there are no S3 buckets open to Everyone or Any AWS user.",
+   "uid": "prowler-aws-s3_bucket_public_access-123456789012-us-east-1-public-data"
+  },
+  "resources": [
+   {
+    "cloud_partition": "aws",
+    "region": "us-east-1",
+    "data": {
+     "details": "",
+     "tags": {
+      "owner": "CANARY-TAG-VALUE"
+     }
+    },
+    "group": {
+     "name": "s3"
+    },
+    "labels": [],
+    "name": "public-data",
+    "type": "AwsS3Bucket",
+    "uid": "arn:aws:s3:::public-data"
+   }
+  ],
+  "category_name": "Findings",
+  "category_uid": 2,
+  "class_name": "Detection Finding",
+  "class_uid": 2004,
+  "cloud": {
+   "account": {
+    "name": "audit",
+    "type": "AWS_Account",
+    "type_id": 10,
+    "uid": "123456789012",
+    "labels": []
+   },
+   "org": {
+    "name": "",
+    "uid": ""
+   },
+   "provider": "aws",
+   "region": "us-east-1"
+  },
+  "event_time": 1700000000,
+  "remediation": {
+   "desc": "Block public access to the bucket.",
+   "references": [
+    "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html"
+   ]
+  },
+  "risk_details": "risk text",
+  "time": 1700000000,
+  "time_dt": "2023-11-14T22:13:20",
+  "type_uid": 200401,
+  "type_name": "Detection Finding: Create"
+ },
+ {
+  "metadata": {
+   "product": {
+    "name": "Prowler",
+    "version": "5.2.0",
+    "vendor_name": "Prowler"
+   },
+   "version": "1.3.0"
+  },
+  "severity_id": 4,
+  "severity": "High",
+  "status": "New",
+  "status_code": "FAIL",
+  "status_detail": "detail from prowler with Password: hunter2-not-real",
+  "status_id": 1,
+  "unmapped": {
+   "check_type": "",
+   "related_url": "",
+   "categories": [],
+   "depends_on": [],
+   "related_to": [],
+   "notes": "",
+   "compliance": {
+    "CIS-1.4": [
+     "1.5"
+    ]
+   }
+  },
+  "activity_name": "Create",
+  "activity_id": 1,
+  "finding_info": {
+   "created_time": 1700000000,
+   "desc": "long description Ensure no security groups allow ingress from 0.0.0.0/0 or ::/0 to SSH port 22.",
+   "product_uid": "prowler",
+   "title": "Ensure no security groups allow ingress from 0.0.0.0/0 or ::/0 to SSH port 22.",
+   "uid": "prowler-aws-ec2_securitygroup_allow_ingress_from_internet_to_tcp_port_22-123456789012-us-east-1-sg-0open0000000001"
+  },
+  "resources": [
+   {
+    "cloud_partition": "aws",
+    "region": "us-east-1",
+    "data": {
+     "details": "",
+     "tags": {
+      "owner": "CANARY-TAG-VALUE"
+     }
+    },
+    "group": {
+     "name": "ec2"
+    },
+    "labels": [],
+    "name": "sg-0open0000000001",
+    "type": "AwsEc2SecurityGroup",
+    "uid": "arn:aws:ec2:us-east-1:123456789012:security-group/sg-0open0000000001"
+   }
+  ],
+  "category_name": "Findings",
+  "category_uid": 2,
+  "class_name": "Detection Finding",
+  "class_uid": 2004,
+  "cloud": {
+   "account": {
+    "name": "audit",
+    "type": "AWS_Account",
+    "type_id": 10,
+    "uid": "123456789012",
+    "labels": []
+   },
+   "org": {
+    "name": "",
+    "uid": ""
+   },
+   "provider": "aws",
+   "region": "us-east-1"
+  },
+  "event_time": 1700000000,
+  "remediation": {
+   "desc": "Restrict the rule.",
+   "references": []
+  },
+  "risk_details": "risk text",
+  "time": 1700000000,
+  "time_dt": "2023-11-14T22:13:20",
+  "type_uid": 200401,
+  "type_name": "Detection Finding: Create"
+ },
+ {
+  "metadata": {
+   "event_code": "ec2_elastic_ip_unassigned",
+   "product": {
+    "name": "Prowler",
+    "version": "5.2.0",
+    "vendor_name": "Prowler"
+   },
+   "version": "1.3.0"
+  },
+  "severity_id": 2,
+  "severity": "Low",
+  "status": "New",
+  "status_code": "FAIL",
+  "status_detail": "detail from prowler with Password: hunter2-not-real",
+  "status_id": 1,
+  "unmapped": {
+   "check_type": "",
+   "related_url": "",
+   "categories": [],
+   "depends_on": [],
+   "related_to": [],
+   "notes": "",
+   "compliance": {
+    "CIS-1.4": [
+     "1.5"
+    ]
+   }
+  },
+  "activity_name": "Create",
+  "activity_id": 1,
+  "finding_info": {
+   "created_time": 1700000000,
+   "desc": "long description Check if there is any unassigned Elastic IP.",
+   "product_uid": "prowler",
+   "title": "Check if there is any unassigned Elastic IP.",
+   "uid": "prowler-aws-ec2_elastic_ip_unassigned-123456789012-us-east-1-eipalloc-1"
+  },
+  "resources": [
+   {
+    "cloud_partition": "aws",
+    "region": "us-east-1",
+    "data": {
+     "details": "",
+     "tags": {
+      "owner": "CANARY-TAG-VALUE"
+     }
+    },
+    "group": {
+     "name": "ec2"
+    },
+    "labels": [],
+    "name": "eipalloc-1",
+    "type": "AwsEc2Eip",
+    "uid": "arn:aws:ec2:us-east-1:123456789012:eip-allocation/eipalloc-1"
+   }
+  ],
+  "category_name": "Findings",
+  "category_uid": 2,
+  "class_name": "Detection Finding",
+  "class_uid": 2004,
+  "cloud": {
+   "account": {
+    "name": "audit",
+    "type": "AWS_Account",
+    "type_id": 10,
+    "uid": "123456789012",
+    "labels": []
+   },
+   "org": {
+    "name": "",
+    "uid": ""
+   },
+   "provider": "aws",
+   "region": "us-east-1"
+  },
+  "event_time": 1700000000,
+  "remediation": {
+   "desc": "Release the address.\u0007 Bearer abc.def.ghi",
+   "references": [
+    "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html",
+    "not-a-url"
+   ]
+  },
+  "risk_details": "risk text",
+  "time": 1700000000,
+  "time_dt": "2023-11-14T22:13:20",
+  "type_uid": 200401,
+  "type_name": "Detection Finding: Create"
+ },
+ {
+  "metadata": {
+   "event_code": "iam_user_mfa_enabled_console_access",
+   "product": {
+    "name": "Prowler",
+    "version": "5.2.0",
+    "vendor_name": "Prowler"
+   },
+   "version": "1.3.0"
+  },
+  "severity_id": 4,
+  "severity": "High",
+  "status": "New",
+  "status_code": "PASS",
+  "status_detail": "detail from prowler with Password: hunter2-not-real",
+  "status_id": 1,
+  "unmapped": {
+   "check_type": "",
+   "related_url": "",
+   "categories": [],
+   "depends_on": [],
+   "related_to": [],
+   "notes": "",
+   "compliance": {
+    "CIS-1.4": [
+     "1.5"
+    ]
+   }
+  },
+  "activity_name": "Create",
+  "activity_id": 1,
+  "finding_info": {
+   "created_time": 1700000000,
+   "desc": "long description Ensure MFA is enabled for users with console password",
+   "product_uid": "prowler",
+   "title": "Ensure MFA is enabled for users with console password",
+   "uid": "prowler-aws-iam_user_mfa_enabled_console_access-123456789012-us-east-1-bob"
+  },
+  "resources": [
+   {
+    "cloud_partition": "aws",
+    "region": "us-east-1",
+    "data": {
+     "details": "",
+     "tags": {
+      "owner": "CANARY-TAG-VALUE"
+     }
+    },
+    "group": {
+     "name": "iam"
+    },
+    "labels": [],
+    "name": "bob",
+    "type": "AwsIamUser",
+    "uid": "arn:aws:iam::123456789012:user/bob"
+   }
+  ],
+  "category_name": "Findings",
+  "category_uid": 2,
+  "class_name": "Detection Finding",
+  "class_uid": 2004,
+  "cloud": {
+   "account": {
+    "name": "audit",
+    "type": "AWS_Account",
+    "type_id": 10,
+    "uid": "123456789012",
+    "labels": []
+   },
+   "org": {
+    "name": "",
+    "uid": ""
+   },
+   "provider": "aws",
+   "region": "us-east-1"
+  },
+  "event_time": 1700000000,
+  "remediation": {
+   "desc": "Enable MFA",
+   "references": []
+  },
+  "risk_details": "risk text",
+  "time": 1700000000,
+  "time_dt": "2023-11-14T22:13:20",
+  "type_uid": 200401,
+  "type_name": "Detection Finding: Create"
+ },
+ {
+  "metadata": {
+   "event_code": "iam_support_role_created",
+   "product": {
+    "name": "Prowler",
+    "version": "5.2.0",
+    "vendor_name": "Prowler"
+   },
+   "version": "1.3.0"
+  },
+  "severity_id": 2,
+  "severity": "Low",
+  "status": "New",
+  "status_code": "MANUAL",
+  "status_detail": "detail from prowler with Password: hunter2-not-real",
+  "status_id": 1,
+  "unmapped": {
+   "check_type": "",
+   "related_url": "",
+   "categories": [],
+   "depends_on": [],
+   "related_to": [],
+   "notes": "",
+   "compliance": {
+    "CIS-1.4": [
+     "1.5"
+    ]
+   }
+  },
+  "activity_name": "Create",
+  "activity_id": 1,
+  "finding_info": {
+   "created_time": 1700000000,
+   "desc": "long description Ensure a support role exists",
+   "product_uid": "prowler",
+   "title": "Ensure a support role exists",
+   "uid": "prowler-aws-iam_support_role_created-123456789012-us-east-1-support"
+  },
+  "resources": [
+   {
+    "cloud_partition": "aws",
+    "region": "us-east-1",
+    "data": {
+     "details": "",
+     "tags": {
+      "owner": "CANARY-TAG-VALUE"
+     }
+    },
+    "group": {
+     "name": "iam"
+    },
+    "labels": [],
+    "name": "support",
+    "type": "AwsIamRole",
+    "uid": "arn:aws:iam::123456789012:root"
+   }
+  ],
+  "category_name": "Findings",
+  "category_uid": 2,
+  "class_name": "Detection Finding",
+  "class_uid": 2004,
+  "cloud": {
+   "account": {
+    "name": "audit",
+    "type": "AWS_Account",
+    "type_id": 10,
+    "uid": "123456789012",
+    "labels": []
+   },
+   "org": {
+    "name": "",
+    "uid": ""
+   },
+   "provider": "aws",
+   "region": "us-east-1"
+  },
+  "event_time": 1700000000,
+  "remediation": {
+   "desc": "Create it",
+   "references": []
+  },
+  "risk_details": "risk text",
+  "time": 1700000000,
+  "time_dt": "2023-11-14T22:13:20",
+  "type_uid": 200401,
+  "type_name": "Detection Finding: Create"
+ },
+ {
+  "metadata": {
+   "event_code": "awslambda_function_url_public",
+   "product": {
+    "name": "Prowler",
+    "version": "5.2.0",
+    "vendor_name": "Prowler"
+   },
+   "version": "1.3.0"
+  },
+  "severity_id": 4,
+  "severity": "High",
+  "status": "New",
+  "status_code": "FAIL",
+  "status_detail": "detail from prowler with Password: hunter2-not-real",
+  "status_id": 1,
+  "unmapped": {
+   "check_type": "",
+   "related_url": "",
+   "categories": [],
+   "depends_on": [],
+   "related_to": [],
+   "notes": "",
+   "compliance": {
+    "CIS-1.4": [
+     "1.5"
+    ]
+   }
+  },
+  "activity_name": "Create",
+  "activity_id": 1,
+  "finding_info": {
+   "created_time": 1700000000,
+   "desc": "long description Check public Lambda Function URLs",
+   "product_uid": "prowler",
+   "title": "Check public Lambda Function URLs",
+   "uid": "prowler-aws-awslambda_function_url_public-123456789012-us-east-1-fn-1"
+  },
+  "resources": [
+   {
+    "cloud_partition": "aws",
+    "region": "us-east-1",
+    "data": {
+     "details": "",
+     "tags": {
+      "owner": "CANARY-TAG-VALUE"
+     }
+    },
+    "group": {
+     "name": "awslambda"
+    },
+    "labels": [],
+    "name": "fn-1",
+    "type": "AwsLambdaFunction",
+    "uid": ""
+   }
+  ],
+  "category_name": "Findings",
+  "category_uid": 2,
+  "class_name": "Detection Finding",
+  "class_uid": 2004,
+  "cloud": {
+   "account": {
+    "name": "audit",
+    "type": "AWS_Account",
+    "type_id": 10,
+    "uid": "123456789012",
+    "labels": []
+   },
+   "org": {
+    "name": "",
+    "uid": ""
+   },
+   "provider": "aws",
+   "region": "us-east-1"
+  },
+  "event_time": 1700000000,
+  "remediation": {
+   "desc": "Restrict the URL auth type.",
+   "references": []
+  },
+  "risk_details": "risk text",
+  "time": 1700000000,
+  "time_dt": "2023-11-14T22:13:20",
+  "type_uid": 200401,
+  "type_name": "Detection Finding: Create"
+ },
+ "this element is a string, not an object",
+ {
+  "metadata": {
+   "event_code": "Bad Check Id!",
+   "product": {
+    "name": "Prowler",
+    "version": "5.2.0",
+    "vendor_name": "Prowler"
+   },
+   "version": "1.3.0"
+  },
+  "severity_id": 4,
+  "severity": "High",
+  "status": "New",
+  "status_code": "FAIL",
+  "status_detail": "detail from prowler with Password: hunter2-not-real",
+  "status_id": 1,
+  "unmapped": {
+   "check_type": "",
+   "related_url": "",
+   "categories": [],
+   "depends_on": [],
+   "related_to": [],
+   "notes": "",
+   "compliance": {
+    "CIS-1.4": [
+     "1.5"
+    ]
+   }
+  },
+  "activity_name": "Create",
+  "activity_id": 1,
+  "finding_info": {
+   "created_time": 1700000000,
+   "desc": "long description bad id",
+   "product_uid": "prowler",
+   "title": "bad id",
+   "uid": "prowler-aws-Bad Check Id!-123456789012-us-east-1-x"
+  },
+  "resources": [
+   {
+    "cloud_partition": "aws",
+    "region": "us-east-1",
+    "data": {
+     "details": "",
+     "tags": {
+      "owner": "CANARY-TAG-VALUE"
+     }
+    },
+    "group": {
+     "name": "Bad Check Id!"
+    },
+    "labels": [],
+    "name": "x",
+    "type": "AwsIamUser",
+    "uid": "arn:aws:iam::123456789012:root"
+   }
+  ],
+  "category_name": "Findings",
+  "category_uid": 2,
+  "class_name": "Detection Finding",
+  "class_uid": 2004,
+  "cloud": {
+   "account": {
+    "name": "audit",
+    "type": "AWS_Account",
+    "type_id": 10,
+    "uid": "123456789012",
+    "labels": []
+   },
+   "org": {
+    "name": "",
+    "uid": ""
+   },
+   "provider": "aws",
+   "region": "us-east-1"
+  },
+  "event_time": 1700000000,
+  "remediation": {
+   "desc": "",
+   "references": []
+  },
+  "risk_details": "risk text",
+  "time": 1700000000,
+  "time_dt": "2023-11-14T22:13:20",
+  "type_uid": 200401,
+  "type_name": "Detection Finding: Create"
+ }
+]

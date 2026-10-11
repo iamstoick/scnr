@@ -1,0 +1,309 @@
+id: cloud.aws.inventory-truncated
+engine: cloud-aws
+title: Cloud inventory was truncated; coverage is incomplete
+severity: info
+what: An inventory list (security groups, volumes, buckets, users, keys or regions) hit scnr's pagination cap, or the scan-wide API call budget ran out before every check could run. Resources past the cap were not examined and the engine run is reported as partial.
+why: Misconfigurations in the resources that were not listed are missing from this report, and findings from earlier scans cannot be marked fixed by this run.
+fix: Narrow the scan with cloud.aws.regions in scnr.yaml, use the deep profile for a larger budget, or scan accounts with very large inventories in parts.
+safety: safe
+tags: [cloud, aws, coverage]
+---
+id: cloud.aws.iam.root-mfa-disabled
+engine: cloud-aws
+title: Root account has no MFA
+severity: critical
+cwe: CWE-308
+what: The AWS account's root user, which can do anything in the account including closing it, has no multi-factor device registered.
+why: A leaked or guessed root password alone is enough to take over the whole account.
+fix: Sign in as root, open Security credentials and register a hardware or virtual MFA device. Then stop using root for day-to-day work.
+references: ["https://docs.aws.amazon.com/IAM/latest/UserGuide/enable-virt-mfa-for-root.html"]
+safety: safe
+tags: [cloud, aws, iam]
+---
+id: cloud.aws.iam.root-access-keys
+engine: cloud-aws
+title: Root account has access keys
+severity: critical
+cwe: CWE-250
+what: Long-lived programmatic access keys exist for the root user.
+why: Root keys cannot be restricted by IAM policy; anyone holding them has full control of the account forever, and they are a favourite target in leaked repositories.
+fix: Delete the root access keys in the root user's Security credentials page and create an IAM role or user with only the permissions needed.
+references: ["https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user_manage_access-keys.html"]
+safety: safe
+tags: [cloud, aws, iam]
+---
+id: cloud.aws.iam.user-without-mfa
+engine: cloud-aws
+title: IAM user with console access has no MFA
+severity: high
+cwe: CWE-308
+what: This IAM user can sign in to the console with a password and has no MFA device registered.
+why: Password reuse and phishing are the common ways cloud consoles are taken over; MFA stops both.
+fix: Register an MFA device for the user, or remove the console password if the user only needs programmatic access. Consider enforcing MFA with an IAM policy condition.
+references: ["https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa_enable.html"]
+safety: safe
+tags: [cloud, aws, iam]
+---
+id: cloud.aws.iam.password-policy-missing
+engine: cloud-aws
+title: No account password policy
+severity: medium
+cwe: CWE-521
+what: The account has no IAM password policy, so AWS's permissive defaults apply to every console user.
+why: Short, simple or never-rotated passwords make console accounts easy to guess or reuse from other breaches.
+fix: Set an account password policy requiring at least 14 characters, all character classes and an expiry.
+references: ["https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_account-policy.html"]
+safety: safe
+tags: [cloud, aws, iam]
+---
+id: cloud.aws.iam.password-policy-weak
+engine: cloud-aws
+title: Weak account password policy
+severity: low
+cwe: CWE-521
+what: The IAM password policy allows passwords shorter than 14 characters, does not require every character class, or never expires passwords.
+why: Weak policies let users pick passwords that appear in breach lists.
+fix: Raise the minimum length to 14, require upper, lower, number and symbol characters, and set a maximum age.
+references: ["https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_account-policy.html"]
+safety: safe
+tags: [cloud, aws, iam]
+---
+id: cloud.aws.iam.access-key-stale
+engine: cloud-aws
+title: Active access key older than 90 days
+severity: medium
+cwe: CWE-324
+what: This IAM user has an active access key created more than 90 days ago.
+why: The longer a key lives, the more places it has been copied to; rotation limits the window a leaked key is useful.
+fix: Create a new key, move the workload to it, then deactivate and delete the old one. Prefer IAM roles over long-lived keys.
+references: ["https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html#Using_RotateAccessKey"]
+safety: safe
+tags: [cloud, aws, iam]
+---
+id: cloud.aws.s3.bucket-public
+engine: cloud-aws
+title: S3 bucket is public
+severity: high
+cwe: CWE-284
+what: The bucket's policy status reports it as public, or its ACL grants access to everyone or to any authenticated AWS user.
+why: Public buckets are enumerated continuously; anything stored there should be considered downloaded.
+fix: Remove the public policy statements or ACL grants and turn on Block Public Access for the bucket. Serve genuinely public content through CloudFront.
+references: ["https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html"]
+safety: safe
+tags: [cloud, aws, s3]
+---
+id: cloud.aws.s3.public-access-block-missing
+engine: cloud-aws
+title: S3 bucket without full Block Public Access
+severity: medium
+cwe: CWE-284
+what: The bucket has no Block Public Access configuration, or one of its four settings is off.
+why: Without the block, a single policy or ACL mistake makes the bucket public.
+fix: Enable all four Block Public Access settings on the bucket (and at the account level).
+references: ["https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html"]
+safety: safe
+tags: [cloud, aws, s3]
+---
+id: cloud.aws.s3.encryption-disabled
+engine: cloud-aws
+title: S3 bucket without default encryption
+severity: low
+cwe: CWE-311
+what: The bucket has no default server-side encryption configuration.
+why: Objects written without an explicit encryption header are stored unencrypted; many compliance baselines require encryption at rest.
+fix: Set a default encryption configuration (SSE-S3 or SSE-KMS) on the bucket.
+references: ["https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-encryption.html"]
+safety: safe
+tags: [cloud, aws, s3]
+---
+id: cloud.aws.s3.logging-disabled
+engine: cloud-aws
+title: S3 bucket without access logging
+severity: low
+cwe: CWE-778
+what: Server access logging is not enabled for the bucket.
+why: Without logs there is no record of who read or changed objects when investigating an incident.
+fix: Enable server access logging to a dedicated log bucket, or rely on CloudTrail data events for the bucket.
+references: ["https://docs.aws.amazon.com/AmazonS3/latest/userguide/ServerLogs.html"]
+safety: safe
+tags: [cloud, aws, s3]
+---
+id: cloud.aws.ec2.sg-open-ssh
+engine: cloud-aws
+title: Security group allows SSH from anywhere
+severity: high
+cwe: CWE-284
+what: An ingress rule allows TCP port 22 from 0.0.0.0/0 or ::/0.
+why: Internet-exposed SSH is brute-forced within minutes of appearing; a weak key or password on any attached instance is a foothold.
+fix: Restrict the rule to known source ranges, or remove it and use Systems Manager Session Manager or a bastion.
+references: ["https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/security-group-rules.html"]
+safety: safe
+tags: [cloud, aws, ec2]
+---
+id: cloud.aws.ec2.sg-open-rdp
+engine: cloud-aws
+title: Security group allows RDP from anywhere
+severity: high
+cwe: CWE-284
+what: An ingress rule allows TCP port 3389 from 0.0.0.0/0 or ::/0.
+why: Exposed RDP is the most common ransomware entry point.
+fix: Restrict the rule to known source ranges or remove it; use a VPN or Systems Manager for administrative access.
+references: ["https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/security-group-rules.html"]
+safety: safe
+tags: [cloud, aws, ec2]
+---
+id: cloud.aws.ec2.sg-open-all
+engine: cloud-aws
+title: Security group allows all traffic from anywhere
+severity: high
+cwe: CWE-284
+what: An ingress rule allows every protocol and port from 0.0.0.0/0 or ::/0.
+why: Every service on an attached instance is reachable from the internet, including ones never meant to be exposed.
+fix: Replace the rule with the specific ports and sources the workload needs.
+references: ["https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/security-group-rules.html"]
+safety: safe
+tags: [cloud, aws, ec2]
+---
+id: cloud.aws.ec2.default-sg-allows-traffic
+engine: cloud-aws
+title: Default security group has ingress rules
+severity: medium
+cwe: CWE-1188
+what: The VPC's default security group has ingress rules. Resources created without an explicit group land in it.
+why: Anything launched carelessly inherits these rules; CIS recommends the default group allow nothing.
+fix: Remove all rules from the default security group and attach purpose-specific groups to resources.
+references: ["https://docs.aws.amazon.com/vpc/latest/userguide/default-security-group.html"]
+safety: safe
+tags: [cloud, aws, ec2]
+---
+id: cloud.aws.ec2.ebs-volume-unencrypted
+engine: cloud-aws
+title: EBS volume is not encrypted
+severity: medium
+cwe: CWE-311
+what: The volume was created without encryption.
+why: Snapshots and copies of an unencrypted volume can be shared or leaked in plain text.
+fix: Snapshot the volume, copy the snapshot with encryption on, and replace the volume. Turn on EBS encryption by default for the region.
+references: ["https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSEncryption.html"]
+safety: safe
+tags: [cloud, aws, ec2]
+---
+id: cloud.aws.ec2.ebs-default-encryption-off
+engine: cloud-aws
+title: EBS encryption by default is off in this region
+severity: low
+cwe: CWE-311
+what: New volumes in the region are created unencrypted unless each one asks for encryption.
+why: Enabling the regional default is the one setting that stops new unencrypted volumes from appearing.
+fix: Enable EBS encryption by default in the EC2 settings for the region.
+references: ["https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSEncryption.html#encryption-by-default"]
+safety: safe
+tags: [cloud, aws, ec2]
+---
+id: cloud.aws.ec2.imdsv1-allowed
+engine: cloud-aws
+title: Instance allows IMDSv1
+severity: medium
+cwe: CWE-918
+what: The instance's metadata service accepts requests without a session token (HttpTokens is optional).
+why: A server-side request forgery bug in any application on the instance can read its IAM role credentials from the metadata endpoint.
+fix: Set HttpTokens to required (IMDSv2 only) on the instance and in launch templates.
+references: ["https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html"]
+safety: safe
+tags: [cloud, aws, ec2]
+---
+id: cloud.aws.rds.publicly-accessible
+engine: cloud-aws
+title: RDS instance is publicly accessible
+severity: high
+cwe: CWE-284
+what: The database instance has a public endpoint.
+why: Database ports on the internet attract credential stuffing and exploit attempts around the clock.
+fix: Set Publicly accessible to no, and reach the database over a VPN, a bastion or private connectivity.
+references: ["https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_VPC.WorkingWithRDSInstanceinaVPC.html"]
+safety: safe
+tags: [cloud, aws, rds]
+---
+id: cloud.aws.rds.storage-unencrypted
+engine: cloud-aws
+title: RDS storage is not encrypted
+severity: medium
+cwe: CWE-311
+what: The database instance's storage and snapshots are unencrypted.
+why: A shared or leaked snapshot exposes the whole database in plain text.
+fix: Encryption cannot be enabled in place. Snapshot, copy the snapshot with encryption, restore and cut over.
+references: ["https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html"]
+safety: safe
+tags: [cloud, aws, rds]
+---
+id: cloud.aws.rds.backups-disabled
+engine: cloud-aws
+title: RDS automated backups are disabled
+severity: medium
+cwe: CWE-693
+what: The backup retention period is zero, so no automated backups are kept.
+why: Ransomware, a bad migration or an accidental delete becomes unrecoverable.
+fix: Set a backup retention period (7 to 35 days) and verify restores.
+references: ["https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithAutomatedBackups.html"]
+safety: safe
+tags: [cloud, aws, rds]
+---
+id: cloud.aws.cloudtrail.missing
+engine: cloud-aws
+title: No CloudTrail trail
+severity: high
+cwe: CWE-778
+what: The account has no CloudTrail trail, so API activity is not recorded beyond the 90-day event history.
+why: Without a trail there is no durable audit log to investigate a compromise or prove what changed.
+fix: Create a multi-region trail with log file validation writing to a dedicated, protected bucket.
+references: ["https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-create-a-trail-using-the-console-first-time.html"]
+safety: safe
+tags: [cloud, aws, cloudtrail]
+---
+id: cloud.aws.cloudtrail.not-multi-region
+engine: cloud-aws
+title: CloudTrail trail is single-region
+severity: medium
+cwe: CWE-778
+what: The trail records events from one region only.
+why: Attackers deliberately operate in regions nobody uses; activity there goes unlogged.
+fix: Enable "apply trail to all regions" or create a multi-region trail.
+references: ["https://docs.aws.amazon.com/awscloudtrail/latest/userguide/receive-cloudtrail-log-files-from-multiple-regions.html"]
+safety: safe
+tags: [cloud, aws, cloudtrail]
+---
+id: cloud.aws.cloudtrail.validation-disabled
+engine: cloud-aws
+title: CloudTrail log file validation is off
+severity: low
+cwe: CWE-354
+what: The trail does not produce digest files, so tampering with delivered logs cannot be detected.
+why: An attacker who gains write access to the log bucket can edit history unnoticed.
+fix: Enable log file validation on the trail.
+references: ["https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-log-file-validation-intro.html"]
+safety: safe
+tags: [cloud, aws, cloudtrail]
+---
+id: cloud.aws.cloudtrail.not-logging
+engine: cloud-aws
+title: CloudTrail trail is not logging
+severity: high
+cwe: CWE-778
+what: The trail exists but logging is stopped.
+why: Stopping a trail is a standard attacker step before acting; a stopped trail gives the same blind spot as none.
+fix: Start logging on the trail and alert on StopLogging events.
+references: ["https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-create-and-update-a-trail.html"]
+safety: safe
+tags: [cloud, aws, cloudtrail]
+---
+id: cloud.aws.kms.rotation-disabled
+engine: cloud-aws
+title: KMS key rotation is disabled
+severity: low
+cwe: CWE-324
+what: A customer-managed symmetric KMS key does not rotate its key material automatically.
+why: Rotation limits how much data any one key version protects and is required by common baselines.
+fix: Enable automatic key rotation on the key.
+references: ["https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html"]
+safety: safe
+tags: [cloud, aws, kms]

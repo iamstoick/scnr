@@ -249,6 +249,8 @@ var Forbidden = []string{
 	"--autofix", "--dryrun", "--pro", "--metrics=on", "--metrics=auto", "--enable-version-check", // semgrep: never rewrite files, no Pro/cloud engine, no telemetry
 	"--server", "--token", "--token-header", "--custom-headers", // trivy: no client/server mode, no credential forwarding
 	"--db-auto-update=true", "--only-fixed", // grype: no implicit DB download when offline; never hide unfixed findings
+	// prowler: no fixers/remediation, no Security Hub or S3 upload of results, no Slack/Shodan, no browser auth, no user-supplied config file.
+	"--fixer", "-S", "--security-hub", "--send-sh-only-fails", "-B", "--output-bucket", "--slack", "--shodan", "--browser-auth", "--config-file",
 }
 
 // forbiddenValues are (flag, value) pairs refused regardless of position:

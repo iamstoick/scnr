@@ -16,6 +16,7 @@ import (
 	"github.com/gerald/scnr/internal/adapter/grype"
 	"github.com/gerald/scnr/internal/adapter/nmap"
 	"github.com/gerald/scnr/internal/adapter/nuclei"
+	"github.com/gerald/scnr/internal/adapter/prowler"
 	"github.com/gerald/scnr/internal/adapter/semgrep"
 	"github.com/gerald/scnr/internal/adapter/trivy"
 	"github.com/gerald/scnr/internal/domain"
@@ -89,14 +90,17 @@ func TestCheckForbidden(t *testing.T) {
 		{"-sTU"}, {"-sVC"}, {"-sSU"}, {"-sCV"},
 		// Phase 3: semgrep autofix/pro/metrics/registry-auto, trivy client-server and tokens, grype hiding unfixed.
 		{"--autofix"}, {"--pro"}, {"--metrics=on"}, {"--metrics=auto"}, {"--config", "auto"}, {"--config=auto"}, {"-c", "AUTO"}, {"--enable-version-check"},
-		{"--server", "http://x"}, {"--token", "t"}, {"--token-header", "h"}, {"--custom-headers", "x"}, {"--only-fixed"}, {"--db-auto-update=true"}} {
+		{"--server", "http://x"}, {"--token", "t"}, {"--token-header", "h"}, {"--custom-headers", "x"}, {"--only-fixed"}, {"--db-auto-update=true"},
+		// Phase 4b: prowler fixers, Security Hub / S3 upload, Slack, Shodan, browser auth, user config file.
+		{"--fixer"}, {"-S"}, {"--security-hub"}, {"--send-sh-only-fails"}, {"-B", "bucket"}, {"--output-bucket", "b"}, {"--output-bucket-no-assume", "b"}, {"--slack"}, {"--shodan", "k"}, {"--browser-auth"}, {"--config-file", "/x"}} {
 		if err := adapter.CheckForbidden(bad); err == nil {
 			t.Errorf("%v accepted", bad)
 		}
 	}
 	for _, ok := range [][]string{{"-et", "dos,fuzz,intrusive,bruteforce,dast"}, {"-oX", "-"}, {"-sT", "-sV", "-Pn"}, {"-sTV"}, {"-o", "/tmp/x"}, {"--open"},
 		{"-silent"}, {"-severity", "info"}, {"-sni", "app.example"}, {"-type", "http"}, {"-disable-redirects"}, {"-H", "Host: app.example"}, {"-duc"},
-		{"--metrics=off"}, {"--config", "p/default"}, {"--config", "/opt/rules"}, {"--output", "/tmp/o.json"}, {"--scanners", "vuln,misconfig,secret"}, {"--skip-db-update"}, {"--disable-telemetry"}, {"-o", "json"}, {"--file", "/tmp/g.json"}, {"--oss-only"}} {
+		{"--metrics=off"}, {"--config", "p/default"}, {"--config", "/opt/rules"}, {"--output", "/tmp/o.json"}, {"--scanners", "vuln,misconfig,secret"}, {"--skip-db-update"}, {"--disable-telemetry"}, {"-o", "json"}, {"--file", "/tmp/g.json"}, {"--oss-only"},
+		{"aws", "-M", "json-ocsf", "-o", "/tmp/s", "-F", "prowler", "-z", "-b", "--no-color", "-p", "audit", "-f", "us-east-1"}} {
 		if err := adapter.CheckForbidden(ok); err != nil {
 			t.Errorf("%v refused: %v", ok, err)
 		}
@@ -118,6 +122,10 @@ func TestArgBuildersNeverEmitForbiddenFlags(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	pw, err := prowler.New([]string{"us-east-1"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	scope, _ := safety.NewScope(nil, nil)
 	for _, public := range []bool{false, true} {
 		limits, _, _ := safety.NewLimits(public, safety.LimitRequest{})
@@ -128,7 +136,7 @@ func TestArgBuildersNeverEmitForbiddenFlags(t *testing.T) {
 				if online {
 					o.SemgrepRules = ""
 				}
-				for _, ad := range []adapter.Adapter{nm, nuclei.New(), semgrep.New(), tv, gr} {
+				for _, ad := range []adapter.Adapter{nm, nuclei.New(), semgrep.New(), tv, gr, pw} {
 					for _, tg := range []domain.Target{
 						{Type: domain.TargetHost, Value: "10.0.0.5", Hostname: "10.0.0.5"},
 						{Type: domain.TargetURL, Value: "http://10.0.0.5:8080/", Hostname: "10.0.0.5"},
@@ -136,6 +144,7 @@ func TestArgBuildersNeverEmitForbiddenFlags(t *testing.T) {
 						{Type: domain.TargetPath, Value: "/repo/dir with space"},
 						{Type: domain.TargetImage, Value: "/images/app.tar", Labels: map[string]string{image.SourceLabel: image.SourceDockerTar}},
 						{Type: domain.TargetImage, Value: "/images/oci", Labels: map[string]string{image.SourceLabel: image.SourceOCILayout}},
+						{Type: domain.TargetCloud, Value: "aws://123456789012", Labels: map[string]string{"profile": "audit"}},
 					} {
 						if !ad.Supports(tg) {
 							continue

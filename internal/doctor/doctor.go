@@ -55,6 +55,10 @@ type Options struct {
 	// Adapters by binary name; tools with an adapter are version-checked,
 	// the rest are only looked up on PATH.
 	Adapters map[string]Detector
+	// Extra checks computed by the caller (cloud credential source and
+	// account allowlist, which need the engine packages doctor does not
+	// import). Appended after the tool checks.
+	Extra []Check
 }
 
 // Run executes all checks. It never returns an error for a failing check;
@@ -146,6 +150,7 @@ func Run(ctx context.Context, o Options) ([]Check, error) {
 	if _, ok := o.Adapters["semgrep"]; ok {
 		out = append(out, semgrepRulesCheck(cfg))
 	}
+	out = append(out, o.Extra...)
 
 	// Raw sockets (informational).
 	if os.Geteuid() == 0 {
@@ -269,7 +274,9 @@ func OutboundURLs() []string {
 // ListsOutbound is the fixed list of non-target hosts scnr may contact.
 func ListsOutbound() []string {
 	return []string{"api.osv.dev (SCA lookups, unless --offline)", "www.cisa.gov (KEV, during db update)", "epss.cyentia.com / epss.empiricalsecurity.com (EPSS and its redirect, during db update)",
-		vulndb.GCSHost + " (OSV exports, only during db bundle build)"}
+		vulndb.GCSHost + " (OSV exports, only during db bundle build)",
+		"*.amazonaws.com (AWS API endpoints, public address space only, during aws:// scans; read-only operations, rate-limited and budgeted)",
+		"169.254.169.254 / 169.254.170.2 (EC2/ECS instance credentials, only with cloud.aws.instance_credentials: true, audited)"}
 }
 
 // ToolOutbound lists what the external tools contact on their own when
@@ -281,5 +288,6 @@ func ToolOutbound() []string {
 		"ghcr.io (trivy vulnerability and check databases, unless --offline; dependency and module resolution over the network is always off via --offline-scan)",
 		"grype.anchore.io / toolbox-data.anchore.io (grype vulnerability DB, unless --offline)",
 		"github.com (nuclei template corpus on first run, unless tools.nuclei_templates is set)",
+		"AWS/Azure/GCP APIs directly (prowler, during aws:// scans, with the same profile the native engine confirmed); prowler may also check PyPI for updates: whether a current release does so has not been verified against a live binary",
 	}
 }

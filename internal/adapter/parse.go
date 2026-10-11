@@ -22,12 +22,8 @@ import (
 // bad elements and the first fatal (syntax) error.
 func StreamArray(r io.Reader, key string, fn func(dec *json.Decoder) error) (bad int, err error) {
 	dec := json.NewDecoder(r)
-	tok, err := dec.Token()
-	if err != nil {
-		return 0, fmt.Errorf("json: %w", err)
-	}
-	if d, ok := tok.(json.Delim); !ok || d != '{' {
-		return 0, errors.New("json: top-level value is not an object")
+	if err := openDelim(dec, '{', "object"); err != nil {
+		return 0, err
 	}
 	for dec.More() {
 		kt, err := dec.Token()
@@ -52,21 +48,62 @@ func StreamArray(r io.Reader, key string, fn func(dec *json.Decoder) error) (bad
 		if d, ok := tok.(json.Delim); !ok || d != '[' {
 			return bad, fmt.Errorf("json: %q is not an array", key)
 		}
-		for dec.More() {
-			if err := fn(dec); err != nil {
-				var se *json.SyntaxError
-				if errors.As(err, &se) || errors.Is(err, io.ErrUnexpectedEOF) {
-					return bad, fmt.Errorf("json: %w", err)
-				}
-				if errors.Is(err, ErrSkipElement) {
-					bad++
-					continue
-				}
-				return bad, err
-			}
+		n, err := streamElements(dec, fn)
+		bad += n
+		if err != nil {
+			return bad, err
 		}
 		if _, err := dec.Token(); err != nil { // closing ]
 			return bad, fmt.Errorf("json: %w", err)
+		}
+	}
+	return bad, nil
+}
+
+// StreamTopLevelArray is StreamArray for output whose top-level value is
+// the array itself (prowler's OCSF report): fn is called once per element
+// with the same skip/count semantics.
+func StreamTopLevelArray(r io.Reader, fn func(dec *json.Decoder) error) (bad int, err error) {
+	dec := json.NewDecoder(r)
+	if err := openDelim(dec, '[', "array"); err != nil {
+		return 0, err
+	}
+	if bad, err = streamElements(dec, fn); err != nil {
+		return bad, err
+	}
+	if _, err := dec.Token(); err != nil { // closing ]
+		return bad, fmt.Errorf("json: %w", err)
+	}
+	return bad, nil
+}
+
+// openDelim consumes the top-level opening delimiter and fails when the
+// value is not of the expected kind.
+func openDelim(dec *json.Decoder, want json.Delim, kind string) error {
+	tok, err := dec.Token()
+	if err != nil {
+		return fmt.Errorf("json: %w", err)
+	}
+	if d, ok := tok.(json.Delim); !ok || d != want {
+		return errors.New("json: top-level value is not an " + kind)
+	}
+	return nil
+}
+
+// streamElements drives fn over the elements of the array dec is
+// positioned inside, stopping at the closing bracket (not consumed).
+func streamElements(dec *json.Decoder, fn func(dec *json.Decoder) error) (bad int, err error) {
+	for dec.More() {
+		if err := fn(dec); err != nil {
+			var se *json.SyntaxError
+			if errors.As(err, &se) || errors.Is(err, io.ErrUnexpectedEOF) {
+				return bad, fmt.Errorf("json: %w", err)
+			}
+			if errors.Is(err, ErrSkipElement) {
+				bad++
+				continue
+			}
+			return bad, err
 		}
 	}
 	return bad, nil

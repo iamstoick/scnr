@@ -19,6 +19,7 @@ paths = [
   '''_test\.go$''',
   '''^internal/engine/image/imagetest/''',
   '''^internal/adapter/adaptertest/''',
+  '''^internal/engine/cloud/aws/awstest/''',
 ]
 regexes = [
   '''iac\.(tf|docker|k8s)\.[a-z0-9-]+''',

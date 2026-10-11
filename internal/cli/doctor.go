@@ -1,11 +1,14 @@
 package cli
 
 import (
+	"context"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/gerald/scnr/internal/doctor"
+	cloudaws "github.com/gerald/scnr/internal/engine/cloud/aws"
 )
 
 func (a *App) doctorCmd() *cobra.Command {
@@ -29,7 +32,7 @@ func (a *App) doctorCmd() *cobra.Command {
 			for _, ad := range adapters {
 				detectors[ad.Binary()] = ad
 			}
-			opts := doctor.Options{Home: a.Home, ConfigPath: a.ConfigPath, Store: a.Store, Online: online, Adapters: detectors}
+			opts := doctor.Options{Home: a.Home, ConfigPath: a.ConfigPath, Store: a.Store, Online: online, Adapters: detectors, Extra: a.cloudChecks(cmd.Context())}
 			if online {
 				// Reachability probes go through the same endpoint-restricted
 				// client as the real fetches (SAFETY.md item 9).
@@ -58,4 +61,28 @@ func (a *App) doctorCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&guide, "install-guide", false, "print install commands for optional tools (never runs them)")
 	cmd.Flags().BoolVar(&online, "online", false, "also check reachability of osv.dev and feed hosts")
 	return cmd
+}
+
+// cloudChecks reports which AWS credential source a scan would use (files
+// and env are read; nothing is called) and the account allowlist state.
+func (a *App) cloudChecks(ctx context.Context) []doctor.Check {
+	cfg := a.cloudConfig()
+	var out []doctor.Check
+	src, err := cloudaws.DescribeCredentialSource(ctx, "", cfg.InstanceCredentials)
+	switch {
+	case err != nil:
+		out = append(out, doctor.Check{Name: "aws credentials", Status: doctor.Warn, Detail: a.redact(err.Error()) + " (aws:// scans need one; profiles: aws://<profile>)"})
+	default:
+		out = append(out, doctor.Check{Name: "aws credentials", Status: doctor.OK, Detail: "source " + src + " (not resolved; confirmed by sts:GetCallerIdentity at scan time)"})
+	}
+	switch {
+	case len(cfg.Accounts) == 0:
+		out = append(out, doctor.Check{Name: "aws accounts", Status: doctor.Warn, Detail: "cloud.aws.accounts is empty: aws:// scans need interactive confirmation of the account id and are refused with --non-interactive"})
+	default:
+		out = append(out, doctor.Check{Name: "aws accounts", Status: doctor.OK, Detail: fmt.Sprintf("%d allow-listed (%s)", len(cfg.Accounts), strings.Join(cfg.Accounts, ", "))})
+	}
+	if cfg.InstanceCredentials {
+		out = append(out, doctor.Check{Name: "aws instance credentials", Status: doctor.Warn, Detail: "enabled: IMDS/ECS credential endpoints may be contacted (audited as limit_override)"})
+	}
+	return out
 }

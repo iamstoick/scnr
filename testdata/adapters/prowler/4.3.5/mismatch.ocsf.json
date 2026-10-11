@@ -1,0 +1,178 @@
+[
+ {
+  "metadata": {
+   "event_code": "iam_root_mfa_enabled",
+   "product": {
+    "name": "Prowler",
+    "version": "4.3.5",
+    "vendor_name": "Prowler"
+   },
+   "version": "1.2.0"
+  },
+  "severity_id": 5,
+  "severity": "Critical",
+  "status": "New",
+  "status_code": "FAIL",
+  "status_detail": "detail from prowler with Password: hunter2-not-real",
+  "status_id": 1,
+  "unmapped": {
+   "check_type": "",
+   "related_url": "",
+   "categories": [],
+   "depends_on": [],
+   "related_to": [],
+   "notes": "",
+   "compliance": {
+    "CIS-1.4": [
+     "1.5"
+    ]
+   }
+  },
+  "activity_name": "Create",
+  "activity_id": 1,
+  "finding_info": {
+   "created_time": 1700000000,
+   "desc": "long description Ensure MFA is enabled for the root account",
+   "product_uid": "prowler",
+   "title": "Ensure MFA is enabled for the root account",
+   "uid": "prowler-aws-iam_root_mfa_enabled-123456789012-us-east-1-<root_account>"
+  },
+  "resources": [
+   {
+    "cloud_partition": "aws",
+    "region": "us-east-1",
+    "data": {
+     "details": "",
+     "tags": {
+      "owner": "CANARY-TAG-VALUE"
+     }
+    },
+    "group": {
+     "name": "iam"
+    },
+    "labels": [],
+    "name": "<root_account>",
+    "type": "AwsIamUser",
+    "uid": "arn:aws:iam::123456789012:root"
+   }
+  ],
+  "category_name": "Findings",
+  "category_uid": 2,
+  "class_name": "Detection Finding",
+  "class_uid": 2004,
+  "cloud": {
+   "account": {
+    "name": "audit",
+    "type": "AWS_Account",
+    "type_id": 10,
+    "uid": "123456789012",
+    "labels": []
+   },
+   "org": {
+    "name": "",
+    "uid": ""
+   },
+   "provider": "aws",
+   "region": "us-east-1"
+  },
+  "event_time": 1700000000,
+  "remediation": {
+   "desc": "Using IAM console navigate to Dashboard and expand Activate MFA on your root account.",
+   "references": [
+    "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html#id_root-user_manage_mfa"
+   ]
+  },
+  "risk_details": "risk text",
+  "time": 1700000000,
+  "time_dt": "2023-11-14T22:13:20",
+  "type_uid": 200401,
+  "type_name": "Detection Finding: Create"
+ },
+ {
+  "metadata": {
+   "event_code": "iam_root_mfa_enabled",
+   "product": {
+    "name": "Prowler",
+    "version": "4.3.5",
+    "vendor_name": "Prowler"
+   },
+   "version": "1.2.0"
+  },
+  "severity_id": 5,
+  "severity": "Critical",
+  "status": "New",
+  "status_code": "FAIL",
+  "status_detail": "detail from prowler with Password: hunter2-not-real",
+  "status_id": 1,
+  "unmapped": {
+   "check_type": "",
+   "related_url": "",
+   "categories": [],
+   "depends_on": [],
+   "related_to": [],
+   "notes": "",
+   "compliance": {
+    "CIS-1.4": [
+     "1.5"
+    ]
+   }
+  },
+  "activity_name": "Create",
+  "activity_id": 1,
+  "finding_info": {
+   "created_time": 1700000000,
+   "desc": "long description Ensure MFA is enabled for the root account",
+   "product_uid": "prowler",
+   "title": "Ensure MFA is enabled for the root account",
+   "uid": "prowler-aws-iam_root_mfa_enabled-999999999999-us-east-1-<root_account>"
+  },
+  "resources": [
+   {
+    "cloud_partition": "aws",
+    "region": "us-east-1",
+    "data": {
+     "details": "",
+     "tags": {
+      "owner": "CANARY-TAG-VALUE"
+     }
+    },
+    "group": {
+     "name": "iam"
+    },
+    "labels": [],
+    "name": "<root_account>",
+    "type": "AwsIamUser",
+    "uid": "arn:aws:iam::999999999999:root"
+   }
+  ],
+  "category_name": "Findings",
+  "category_uid": 2,
+  "class_name": "Detection Finding",
+  "class_uid": 2004,
+  "cloud": {
+   "account": {
+    "name": "audit",
+    "type": "AWS_Account",
+    "type_id": 10,
+    "uid": "999999999999",
+    "labels": []
+   },
+   "org": {
+    "name": "",
+    "uid": ""
+   },
+   "provider": "aws",
+   "region": "us-east-1"
+  },
+  "event_time": 1700000000,
+  "remediation": {
+   "desc": "Enable MFA",
+   "references": []
+  },
+  "risk_details": "risk text",
+  "time": 1700000000,
+  "time_dt": "2023-11-14T22:13:20",
+  "type_uid": 200401,
+  "type_name": "Detection Finding: Create"
+ }
+]

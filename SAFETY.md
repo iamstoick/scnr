@@ -231,3 +231,50 @@ These invariants are enforced in code and tests, not by policy alone.
     (refusing a symlink or non-regular file at the destination), and signed
     with a key that never leaves the building machine (`scnr db keygen`,
     0600).
+16. **Cloud credentials are read-only, explicit and account-bound.** The
+    `cloud-aws` engine never calls `config.LoadDefaultConfig`: the chain
+    is built explicitly from environment keys, `AWS_WEB_IDENTITY_TOKEN_FILE`
+    + `AWS_ROLE_ARN`, shared-config profiles (static keys, or `role_arn`
+    with `source_profile`/`credential_source = Environment`, chain depth
+    <= 2) and, only with `cloud.aws.instance_credentials: true` (audited as
+    `limit_override`), IMDS/ECS credentials. `credential_process` profiles
+    are refused (`E_CLOUD_CREDENTIAL_SOURCE`); `sso_*` profiles are refused
+    with a pointer to `aws configure export-credentials`;
+    `AWS_ENDPOINT_URL*` is ignored. `sts:GetCallerIdentity` runs before any
+    other call; the account must be in `cloud.aws.accounts` or typed back
+    interactively (`E_CLOUD_ACCOUNT_NOT_ALLOWED` otherwise), the target is
+    rewritten to `aws://<account>`, every client is built from that one
+    resolved credential object, and the identity is re-checked at the end
+    of the run (a changed account marks the engine failed). Every SDK
+    operation passes a read-only Initialize-step middleware
+    (`^(Get|List|Describe|Head|Lookup)`, with `GenerateCredentialReport`,
+    `GetSessionToken` and `GetFederationToken` denied) and the credential
+    chain's STS client an exact allowlist of `AssumeRole`,
+    `AssumeRoleWithWebIdentity`, `GetCallerIdentity`; the sources are
+    AST-checked against the same lists and the published IAM policy
+    (`scnr config show --aws-policy`) is pinned to them. API traffic goes
+    through `safety.NewEndpointClientPolicy` with `*.amazonaws.com` as the
+    only allowed hosts and private address space refused
+    (`E_ENDPOINT_PRIVATE`: PrivateLink/VPC endpoints are not supported);
+    response bodies are capped at 16 MiB. Calls are rate-limited per region
+    (10/s, deep 20/s), budgeted per scan (5,000, deep 20,000, retries
+    included), paginated with caps (100 pages / 10,000 items per list, 20
+    regions); hitting a cap or the budget emits
+    `cloud.aws.inventory-truncated` and returns `PartialError`, so a
+    truncated run never marks findings fixed. Tags, user data, Lambda
+    environment, policy and ACL documents, descriptions, master usernames
+    and trail bucket names are never read into evidence (AST test on the
+    check sources plus a canary test). Credentials are never logged or
+    stored: the audit row carries the source label and principal ARN only,
+    and SDK errors are control-stripped and redacted. Prowler runs after
+    the native identity check with the same profile, never with `--fixer`,
+    `-S`/`--security-hub`, `-B`/`--output-bucket`, `--slack`, `--shodan`,
+    `--browser-auth` or a user `--config-file` (all in `adapter.Forbidden`);
+    its OCSF output is streamed with a field allowlist and elements for any
+    other account are dropped and reported (`prowler:account-mismatch`).
+    *Residual:* prowler resolves credentials and contacts the cloud APIs
+    with its own stack, outside `safety.Dialer`, and may check PyPI for
+    updates (unverified against a live binary). Azure/GCP have no native
+    identity confirmation and no target type in this version, so prowler
+    is not run for them. HTTP proxies are not used for cloud API traffic
+    (a proxy host would fail the endpoint allowlist, closed).

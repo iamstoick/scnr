@@ -28,6 +28,10 @@ type Dialer struct {
 	// declared hosts, not a scan scope where private space is implicitly
 	// in bounds).
 	RequireAllow bool
+	// RefusePrivate refuses any destination with a private, loopback or
+	// link-local address (E_ENDPOINT_PRIVATE). Set by the cloud endpoint
+	// client: API traffic to a vendor must land in public address space.
+	RefusePrivate bool
 
 	pins *pinSet
 }
@@ -46,7 +50,7 @@ type pinSet struct {
 // with a different connect timeout.
 func (d *Dialer) WithTimeout(t time.Duration) *Dialer {
 	d.ensurePins()
-	return &Dialer{Scope: d.Scope, Resolver: d.Resolver, Limits: d.Limits, Timeout: t, RequireAllow: d.RequireAllow, pins: d.pins}
+	return &Dialer{Scope: d.Scope, Resolver: d.Resolver, Limits: d.Limits, Timeout: t, RequireAllow: d.RequireAllow, RefusePrivate: d.RefusePrivate, pins: d.pins}
 }
 
 func (d *Dialer) ensurePins() {
@@ -135,6 +139,10 @@ func (d *Dialer) check(host string, ips []netip.Addr, rawURL string) (bool, erro
 	}
 	if d.RequireAllow && !d.Scope.Allowed(host, ips, rawURL) {
 		return public, &RefusalError{Code: CodeScopeNotAllowed, Target: host, Reason: "not a declared endpoint host"}
+	}
+	if d.RefusePrivate && AnyPrivate(ips) {
+		return public, &RefusalError{Code: CodeEndpointPrivate, Target: host,
+			Reason: fmt.Sprintf("resolves to a non-public address (%v); private (PrivateLink/VPC) endpoints are not supported, use the public endpoint", ips)}
 	}
 	return public, nil
 }

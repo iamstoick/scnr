@@ -95,10 +95,12 @@ func TestRunChecks(t *testing.T) {
 	if !strings.Contains(buf.String(), "never runs these") || !strings.Contains(buf.String(), "trivy") {
 		t.Fatal(buf.String())
 	}
-	if len(ListsOutbound()) != 4 {
+	// Phase 4b adds the two cloud host classes (AWS API endpoints and,
+	// opt-in, the instance credential endpoints) and prowler's own traffic.
+	if len(ListsOutbound()) != 6 || !strings.Contains(strings.Join(ListsOutbound(), " "), "*.amazonaws.com") {
 		t.Fatal("outbound list")
 	}
-	if len(ToolOutbound()) != 4 {
+	if len(ToolOutbound()) != 5 || !strings.Contains(strings.Join(ToolOutbound(), " "), "prowler") {
 		t.Fatal("tool outbound list")
 	}
 	// semgrep rules: warns about the registry fetch when unset, OK when a

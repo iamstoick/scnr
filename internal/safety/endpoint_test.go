@@ -1,6 +1,7 @@
 package safety
 
 import (
+	"context"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -56,6 +57,66 @@ func TestEndpointClientAllowlist(t *testing.T) {
 	if _, err := NewEndpointClient([]string{"a b"}, HTTPOptions{}); err == nil {
 		t.Fatal("bad host accepted")
 	}
+
+	// B5 (cloud client class): wildcard allowlist, no suffix tricks, a
+	// redirect to the metadata endpoint refused, and RefusePrivate turning
+	// an RFC1918 answer into E_ENDPOINT_PRIVATE before any dial.
+	res := &fakeResolver{hosts: map[string][]string{
+		"sts.amazonaws.com":                  {"52.1.2.3"},
+		"evil.amazonaws.com.attacker.net":    {"52.1.2.4"},
+		"vpce-1.sts.eu-west-1.amazonaws.com": {"10.20.30.40"},
+	}}
+	cloud, err := NewEndpointClientPolicy([]string{"*.amazonaws.com"}, HTTPOptions{}, EndpointPolicy{RefusePrivate: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := cloud.Transport.(*limitedTransport).dialer
+	d.Resolver = res
+	ctx := context.Background()
+	if err := d.CheckURL(ctx, mustURL(t, "https://sts.amazonaws.com/")); err != nil {
+		t.Fatalf("public AWS endpoint refused: %v", err)
+	}
+	if err := d.CheckURL(ctx, mustURL(t, "https://evil.amazonaws.com.attacker.net/")); err == nil || !strings.Contains(err.Error(), CodeScopeNotAllowed) {
+		t.Fatalf("suffix trick accepted: %v", err)
+	}
+	if err := d.CheckURL(ctx, mustURL(t, "http://169.254.169.254/latest/meta-data/")); err == nil || !strings.Contains(err.Error(), "E_SCOPE") {
+		t.Fatalf("metadata endpoint accepted: %v", err)
+	}
+	if err := d.CheckURL(ctx, mustURL(t, "https://vpce-1.sts.eu-west-1.amazonaws.com/")); err == nil || !strings.Contains(err.Error(), CodeEndpointPrivate) {
+		t.Fatalf("private (PrivateLink) endpoint accepted: %v", err)
+	}
+	// A redirect from an allowed host to the metadata endpoint is refused
+	// by the redirect policy (the same check), never followed.
+	if err := cloud.CheckRedirect(&http.Request{URL: mustURL(t, "http://169.254.169.254/")}, []*http.Request{{URL: mustURL(t, "https://sts.amazonaws.com/")}}); err == nil {
+		t.Fatal("redirect to metadata followed")
+	} else if _, ok := AsRedirectOutOfScope(err); !ok {
+		t.Fatalf("redirect refusal type: %v", err)
+	}
+	// Without RefusePrivate (test override) the private answer is allowed
+	// when the host is explicitly listed; with AllowMetadata the built-in
+	// deny is set aside for that one client only.
+	plain, _ := NewEndpointClientPolicy([]string{"vpce-1.sts.eu-west-1.amazonaws.com"}, HTTPOptions{}, EndpointPolicy{})
+	pd := plain.Transport.(*limitedTransport).dialer
+	pd.Resolver = res
+	if err := pd.CheckURL(ctx, mustURL(t, "https://vpce-1.sts.eu-west-1.amazonaws.com/")); err != nil {
+		t.Fatalf("listed private host without RefusePrivate: %v", err)
+	}
+	meta, _ := NewEndpointClientPolicy([]string{"169.254.169.254"}, HTTPOptions{}, EndpointPolicy{AllowMetadata: true})
+	if err := meta.Transport.(*limitedTransport).dialer.CheckURL(ctx, mustURL(t, "http://169.254.169.254/latest/api/token")); err != nil {
+		t.Fatalf("AllowMetadata client refused IMDS: %v", err)
+	}
+	if err := meta.Transport.(*limitedTransport).dialer.CheckURL(ctx, mustURL(t, "http://169.254.170.2/v2/credentials")); err == nil {
+		t.Fatal("AllowMetadata client reached an unlisted metadata host")
+	}
+}
+
+func mustURL(t *testing.T, raw string) *url.URL {
+	t.Helper()
+	u, err := url.Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return u
 }
 
 func mustHost(t *testing.T, raw string) string {

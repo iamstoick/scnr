@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -57,7 +58,48 @@ type Tools struct {
 	// which semgrep downloads from semgrep.dev on each run (metrics stay
 	// off); set this to run against rules you chose.
 	SemgrepRules string `yaml:"semgrep_rules,omitempty"`
+	// GCPCredentialsFile is an absolute path passed to prowler as
+	// --credentials-file for GCP projects.
+	GCPCredentialsFile string `yaml:"gcp_credentials_file,omitempty"`
 }
+
+// Cloud scopes cloud-posture scans (Phase 4b).
+type Cloud struct {
+	AWS   CloudAWS   `yaml:"aws,omitempty"`
+	Azure CloudAzure `yaml:"azure,omitempty"`
+	GCP   CloudGCP   `yaml:"gcp,omitempty"`
+}
+
+// CloudAWS binds AWS scans to accounts and regions.
+type CloudAWS struct {
+	// Accounts are the 12-digit account ids a scan may run against without
+	// an interactive confirmation; required for --non-interactive.
+	Accounts []string `yaml:"accounts,omitempty"`
+	// Regions limits regional checks; empty means the account's enabled
+	// regions, capped at MaxCloudRegions.
+	Regions []string `yaml:"regions,omitempty"`
+	// InstanceCredentials allows EC2 instance / ECS container credentials
+	// (IMDS, otherwise denied). Audited when used.
+	InstanceCredentials bool `yaml:"instance_credentials,omitempty"`
+}
+
+// CloudAzure lists subscriptions for the prowler adapter.
+type CloudAzure struct {
+	Subscriptions []string `yaml:"subscriptions,omitempty"`
+}
+
+// CloudGCP lists projects for the prowler adapter.
+type CloudGCP struct {
+	Projects []string `yaml:"projects,omitempty"`
+}
+
+// MaxCloudRegions caps the regions one scan covers.
+const MaxCloudRegions = 20
+
+var (
+	awsAccountRe = regexp.MustCompile(`^[0-9]{12}$`)
+	awsRegionRe  = regexp.MustCompile(`^[a-z]{2}(-[a-z]+)+-[0-9]$`)
+)
 
 // VulnDB configures offline vulnerability bundles (Phase 4a).
 type VulnDB struct {
@@ -75,6 +117,7 @@ type Config struct {
 	Limits        Limits        `yaml:"limits,omitempty"`
 	Tools         Tools         `yaml:"tools,omitempty"`
 	VulnDB        VulnDB        `yaml:"vulndb,omitempty"`
+	Cloud         Cloud         `yaml:"cloud,omitempty"`
 	Online        *bool         `yaml:"online,omitempty"`
 	Path          string        `yaml:"-"`
 }
@@ -164,6 +207,22 @@ func (c *Config) Validate() error {
 	for _, k := range c.VulnDB.TrustedKeys {
 		if !strings.HasPrefix(k, "ed25519:") || len(k) > 128 {
 			return fmt.Errorf("vulndb.trusted_keys: %q must be ed25519:<base64> (from `scnr db keygen`)", k)
+		}
+	}
+	if d := c.Tools.GCPCredentialsFile; d != "" && !filepath.IsAbs(d) {
+		return fmt.Errorf("tools.gcp_credentials_file must be an absolute path, got %q", d)
+	}
+	for _, a := range c.Cloud.AWS.Accounts {
+		if !awsAccountRe.MatchString(a) {
+			return fmt.Errorf("cloud.aws.accounts: %q must be a 12-digit account id", a)
+		}
+	}
+	if len(c.Cloud.AWS.Regions) > MaxCloudRegions {
+		return fmt.Errorf("cloud.aws.regions: at most %d regions", MaxCloudRegions)
+	}
+	for _, r := range c.Cloud.AWS.Regions {
+		if !awsRegionRe.MatchString(r) {
+			return fmt.Errorf("cloud.aws.regions: %q is not a region name", r)
 		}
 	}
 	return nil

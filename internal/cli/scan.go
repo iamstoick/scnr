@@ -16,12 +16,14 @@ import (
 	"github.com/gerald/scnr/internal/adapter/grype"
 	"github.com/gerald/scnr/internal/adapter/nmap"
 	"github.com/gerald/scnr/internal/adapter/nuclei"
+	"github.com/gerald/scnr/internal/adapter/prowler"
 	"github.com/gerald/scnr/internal/adapter/semgrep"
 	"github.com/gerald/scnr/internal/adapter/trivy"
 	"github.com/gerald/scnr/internal/audit"
 	"github.com/gerald/scnr/internal/config"
 	"github.com/gerald/scnr/internal/domain"
 	"github.com/gerald/scnr/internal/engine"
+	cloudaws "github.com/gerald/scnr/internal/engine/cloud/aws"
 	"github.com/gerald/scnr/internal/engine/codecheck"
 	"github.com/gerald/scnr/internal/engine/iac"
 	"github.com/gerald/scnr/internal/engine/image"
@@ -89,16 +91,23 @@ func (a *App) scanCmd() *cobra.Command {
 	return cmd
 }
 
-// engineRegistry builds the native engines plus the Phase 2 adapters.
-func (a *App) engineRegistry() (*engine.Registry, *netscan.Engine, error) {
+// engines bundles the registry with the engines RunScan wires elsewhere.
+type engines struct {
+	reg *engine.Registry
+	ns  *netscan.Engine
+	aws *cloudaws.Engine
+}
+
+// engineRegistry builds the native engines plus the adapters.
+func (a *App) engineRegistry() (*engines, error) {
 	reg := engine.NewRegistry()
 	ns, err := netscan.New()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	sec, err := secrets.New()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	osvBase := a.OSVBase
 	if osvBase == "" {
@@ -106,44 +115,73 @@ func (a *App) engineRegistry() (*engine.Registry, *netscan.Engine, error) {
 	}
 	osvHTTP, err := a.endpointClient(osvBase)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	osvHTTP.Timeout = 60 * time.Second
 	osv := &sca.OSVClient{Base: a.OSVBase, Cache: a.Store, HTTP: osvHTTP}
 	sc, err := sca.New(osv)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if a.Store != nil {
 		sc.Offline = &sca.OfflineClient{Store: a.Store}
 	}
 	ws, err := webscan.New()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	img, err := image.New(sc)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	ia, err := iac.New()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	cc, err := codecheck.New()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
+	}
+	aws, err := a.awsEngine()
+	if err != nil {
+		return nil, err
 	}
 	adapters, err := a.adapters()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	for _, e := range []engine.Engine{ns, sec, sc, ws, img, ia, cc} {
+	for _, e := range []engine.Engine{ns, sec, sc, ws, img, ia, cc, aws} {
 		reg.Register(e)
 	}
 	for _, ad := range adapters {
 		reg.Register(ad)
 	}
-	return reg, ns, nil
+	return &engines{reg: reg, ns: ns, aws: aws}, nil
+}
+
+// cloudConfig is cloud.aws from the scope file (empty before Open).
+func (a *App) cloudConfig() config.CloudAWS {
+	if a.Config == nil {
+		return config.CloudAWS{}
+	}
+	return a.Config.Cloud.AWS
+}
+
+// awsEngine builds the native AWS posture engine. The endpoint override
+// exists for tests only; it is never read from a flag or the config.
+func (a *App) awsEngine() (*cloudaws.Engine, error) {
+	e, err := cloudaws.New(a.cloudConfig())
+	if err != nil {
+		return nil, err
+	}
+	if a.AWSEndpoint != "" {
+		host := safety.URLHost(a.AWSEndpoint)
+		if host == "" {
+			return nil, fmt.Errorf("AWSEndpoint %q: not a URL", a.AWSEndpoint)
+		}
+		e.BaseEndpoint, e.EndpointHosts = a.AWSEndpoint, []string{host}
+	}
+	return e, nil
 }
 
 // adapters lists the external-tool adapters (doctor reports them too).
@@ -160,7 +198,15 @@ func (a *App) adapters() ([]adapter.Adapter, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []adapter.Adapter{nm, nuclei.New(), semgrep.New(), tv, gr}, nil
+	aws, err := cloudaws.New(a.cloudConfig())
+	if err != nil {
+		return nil, err
+	}
+	pw, err := prowler.New(a.cloudConfig().Regions, aws.Rules())
+	if err != nil {
+		return nil, err
+	}
+	return []adapter.Adapter{nm, nuclei.New(), semgrep.New(), tv, gr, pw}, nil
 }
 
 const ackShort = "I am authorised to scan these targets and accept responsibility for doing so"
@@ -196,11 +242,12 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 	if err != nil {
 		return nil, ExitUsage, err
 	}
-	reg, ns, err := a.engineRegistry()
+	engs, err := a.engineRegistry()
 	if err != nil {
 		return nil, ExitUsage, err
 	}
-	ports, err := ns.ParsePorts(req.Ports)
+	reg := engs.reg
+	ports, err := engs.ns.ParsePorts(req.Ports)
 	if err != nil {
 		return nil, ExitUsage, err
 	}
@@ -281,6 +328,7 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 	gate := &safety.Gate{
 		Scope: scope, Acknowledged: cfg.Authorization.Acknowledged || req.AckAuthorized,
 		Resolver: a.Resolver, Verified: verifier.IsVerified, MaxHosts: req.MaxHosts,
+		CloudIdentity: engs.aws.Identity, CloudAccounts: cfg.Cloud.AWS.Accounts,
 	}
 	if interactive {
 		gate.Consent = a.consentPrompt
@@ -300,12 +348,13 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 	}
 	var plans []planned
 	consentMethod := domain.ConsentLocal
-	for _, t := range targets {
-		engs, err := reg.Select(t, profile, req.Engines, req.SkipEngines)
+	var cloudIdentity *safety.CloudIdentity
+	for i, t := range targets {
+		selected, err := reg.Select(t, profile, req.Engines, req.SkipEngines)
 		if err != nil {
 			return nil, ExitUsage, err
 		}
-		planText := a.planSummary(ctx, engs, t, opts)
+		planText := a.planSummary(ctx, selected, t, opts)
 		dec, err := gate.Decide(ctx, t, planText)
 		if err != nil {
 			err = a.redactErr(err)
@@ -322,7 +371,17 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 		if t.Hostname != "" && len(dec.Addrs) > 0 {
 			dialer.Pin(t.Hostname, dec.Addrs)
 		}
-		plans = append(plans, planned{t: t, engines: engs, dec: dec})
+		if dec.Identity != nil {
+			// The gate pinned the account: the scan record, asset and every
+			// engine see aws://<account>, never the profile form.
+			t = dec.Target
+			targets[i] = t
+			cloudIdentity = dec.Identity
+			if dec.Identity.Source == cloudaws.SourceInstance {
+				_ = a.Audit.Log(ctx, audit.ActionLimitOverride, "", map[string]any{"target": t.Raw, "instance_credentials": true})
+			}
+		}
+		plans = append(plans, planned{t: t, engines: selected, dec: dec})
 	}
 	if raised {
 		_ = a.Audit.Log(ctx, audit.ActionLimitOverride, "", map[string]any{"rate": limits.RatePerSec, "concurrency": limits.PerHostConcurrency})
@@ -438,6 +497,10 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 	}
 	if policy != nil {
 		detail["policy"] = map[string]any{"path": policy.Path, "violations": violations}
+	}
+	if cloudIdentity != nil {
+		// Source and principal only: never a key id or token.
+		detail["cloud_identity"] = map[string]any{"provider": cloudIdentity.Provider, "account": cloudIdentity.Account, "principal": cloudIdentity.Principal, "source": cloudIdentity.Source}
 	}
 	_ = a.Audit.Log(context.WithoutCancel(ctx), audit.ActionScan, scan.ID, detail)
 
@@ -616,7 +679,7 @@ func firstNonZero(a, b int) int {
 	return b
 }
 
-var consentRank = map[string]int{domain.ConsentLocal: 0, domain.ConsentPrivateRange: 1, domain.ConsentDNSTXT: 2, domain.ConsentWellKnown: 2, domain.ConsentInteractive: 3}
+var consentRank = map[string]int{domain.ConsentLocal: 0, domain.ConsentPrivateRange: 1, domain.ConsentDNSTXT: 2, domain.ConsentWellKnown: 2, domain.ConsentCloudAllowlist: 2, domain.ConsentInteractive: 3}
 
 func strongerConsent(a, b string) string {
 	if consentRank[b] > consentRank[a] {
@@ -656,7 +719,12 @@ func (a *App) consentPrompt(_ context.Context, t domain.Target, plan string) (bo
 	if want == "" {
 		want = t.Value
 	}
-	fmt.Fprintf(a.Stdout, "\n%s is a PUBLIC target. Plan:\n%s\n\nYou must own this system or have written permission to test it.\nType the target (%s) to confirm, or anything else to cancel: ", t.Raw, plan, want)
+	if t.Type == domain.TargetCloud {
+		// want is the confirmed account id (the gate set Hostname to it).
+		fmt.Fprintf(a.Stdout, "\n%s\n\nThis account is not listed in cloud.aws.accounts. You must own it or have written permission to assess it.\nType the account ID (%s) to continue, or anything else to cancel: ", plan, want)
+	} else {
+		fmt.Fprintf(a.Stdout, "\n%s is a PUBLIC target. Plan:\n%s\n\nYou must own this system or have written permission to test it.\nType the target (%s) to confirm, or anything else to cancel: ", t.Raw, plan, want)
+	}
 	rd := bufio.NewReader(a.Stdin)
 	line, err := rd.ReadString('\n')
 	if err != nil && line == "" {

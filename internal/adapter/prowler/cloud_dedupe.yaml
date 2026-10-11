@@ -1,0 +1,31 @@
+# prowler check id -> native cloud-aws rule id. A mapped prowler finding
+# takes the native rule id (and prose), so native and prowler results for
+# the same ARN share one fingerprint. Keys: ^[a-z0-9_]{3,100}$.
+iam_root_mfa_enabled: cloud.aws.iam.root-mfa-disabled
+iam_no_root_access_key: cloud.aws.iam.root-access-keys
+iam_user_mfa_enabled_console_access: cloud.aws.iam.user-without-mfa
+iam_password_policy_minimum_length_14: cloud.aws.iam.password-policy-weak
+iam_password_policy_symbol: cloud.aws.iam.password-policy-weak
+iam_password_policy_number: cloud.aws.iam.password-policy-weak
+iam_password_policy_uppercase: cloud.aws.iam.password-policy-weak
+iam_password_policy_lowercase: cloud.aws.iam.password-policy-weak
+iam_password_policy_expires_passwords_within_90_days_or_less: cloud.aws.iam.password-policy-weak
+iam_rotate_access_key_90_days: cloud.aws.iam.access-key-stale
+s3_bucket_public_access: cloud.aws.s3.bucket-public
+s3_bucket_policy_public_write_access: cloud.aws.s3.bucket-public
+s3_bucket_level_public_access_block: cloud.aws.s3.public-access-block-missing
+s3_bucket_default_encryption: cloud.aws.s3.encryption-disabled
+s3_bucket_server_access_logging_enabled: cloud.aws.s3.logging-disabled
+ec2_securitygroup_allow_ingress_from_internet_to_tcp_port_22: cloud.aws.ec2.sg-open-ssh
+ec2_securitygroup_allow_ingress_from_internet_to_tcp_port_3389: cloud.aws.ec2.sg-open-rdp
+ec2_securitygroup_allow_ingress_from_internet_to_any_port: cloud.aws.ec2.sg-open-all
+ec2_securitygroup_default_restrict_traffic: cloud.aws.ec2.default-sg-allows-traffic
+ec2_ebs_volume_encryption: cloud.aws.ec2.ebs-volume-unencrypted
+ec2_ebs_default_encryption: cloud.aws.ec2.ebs-default-encryption-off
+ec2_instance_imdsv2_enabled: cloud.aws.ec2.imdsv1-allowed
+rds_instance_no_public_access: cloud.aws.rds.publicly-accessible
+rds_instance_storage_encrypted: cloud.aws.rds.storage-unencrypted
+rds_instance_backup_enabled: cloud.aws.rds.backups-disabled
+cloudtrail_multi_region_enabled: cloud.aws.cloudtrail.not-multi-region
+cloudtrail_log_file_validation_enabled: cloud.aws.cloudtrail.validation-disabled
+kms_cmk_rotation_enabled: cloud.aws.kms.rotation-disabled

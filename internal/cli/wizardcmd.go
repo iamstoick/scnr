@@ -19,10 +19,11 @@ func (a *App) runWizard(ctx context.Context) error {
 	if err := a.Open(ctx); err != nil {
 		return err
 	}
-	reg, _, err := a.engineRegistry()
+	engs, err := a.engineRegistry()
 	if err != nil {
 		return err
 	}
+	reg := engs.reg
 	det := a.Detector()
 	deps := wizard.Deps{
 		Out:          a.Stdout,

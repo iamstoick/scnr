@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/netip"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/gerald/scnr/internal/domain"
@@ -26,6 +27,19 @@ type ConsentFunc func(ctx context.Context, t domain.Target, plan string) (bool, 
 // VerifiedFunc reports whether host has a non-expired ownership verification.
 type VerifiedFunc func(ctx context.Context, host string) (bool, error)
 
+// CloudIdentityFunc confirms who the credentials are and returns the
+// account/subscription/project id. It performs exactly one identity call
+// (sts:GetCallerIdentity) and nothing else.
+type CloudIdentityFunc func(ctx context.Context, t domain.Target) (CloudIdentity, error)
+
+// CloudIdentity is the result of a cloud identity confirmation.
+type CloudIdentity struct {
+	Provider  string // "aws"
+	Account   string // 12-digit account id
+	Principal string // caller ARN
+	Source    string // "env" | "profile:<name>" | "web-identity" | "instance"
+}
+
 // Gate makes the per-target authorisation decision (Section 9).
 type Gate struct {
 	Scope        *Scope
@@ -34,6 +48,12 @@ type Gate struct {
 	Verified     VerifiedFunc
 	Consent      ConsentFunc
 	MaxHosts     int // explicit --max-hosts; 0 = not set
+	// CloudIdentity confirms the account behind a cloud target before any
+	// other API call; nil means cloud targets are refused.
+	CloudIdentity CloudIdentityFunc
+	// CloudAccounts is cloud.aws.accounts from the scope file: a confirmed
+	// account listed here is allowed without a prompt.
+	CloudAccounts []string
 }
 
 // CIDR caps (Section 9 step 6).
@@ -51,6 +71,9 @@ type Decision struct {
 	Addrs            []netip.Addr
 	HostCount        int
 	MaxHostsOverride bool // user raised the CIDR cap; audited by caller
+	// Identity is set for cloud targets: the confirmed account the scan is
+	// bound to. Target.Value is rewritten to "<provider>://<account>".
+	Identity *CloudIdentity
 }
 
 // Decide applies the ordered rules. plan is shown to the user before
@@ -63,9 +86,7 @@ func (g *Gate) Decide(ctx context.Context, t domain.Target, plan string) (*Decis
 	d := &Decision{Target: t, HostCount: 1}
 	switch t.Type {
 	case domain.TargetCloud:
-		// Identity confirmation (sts) is Phase 4; cloud engines do not exist yet.
-		d.ConsentMethod = domain.ConsentLocal
-		return d, nil
+		return g.decideCloud(ctx, d, plan)
 	case domain.TargetPath, domain.TargetImage:
 		d.ConsentMethod = domain.ConsentLocal
 		return d, nil
@@ -121,7 +142,11 @@ func (g *Gate) decideHost(ctx context.Context, d *Decision, plan string) (*Decis
 // is the refusal reason when no consent function is available.
 func (g *Gate) askConsent(ctx context.Context, d *Decision, plan, nonInteractive string) (*Decision, error) {
 	if g.Consent == nil {
-		return nil, &RefusalError{Code: CodeOwnershipRequired, Target: d.Target.Raw, Reason: nonInteractive}
+		code := CodeOwnershipRequired
+		if d.Identity != nil {
+			code = CodeCloudAccountNotAllowed
+		}
+		return nil, &RefusalError{Code: code, Target: d.Target.Raw, Reason: nonInteractive}
 	}
 	ok, err := g.Consent(ctx, d.Target, plan)
 	if err != nil {
@@ -133,6 +158,51 @@ func (g *Gate) askConsent(ctx context.Context, d *Decision, plan, nonInteractive
 	d.ConsentMethod = domain.ConsentInteractive
 	return d, nil
 }
+
+// decideCloud binds the scan to the account the credentials actually
+// belong to: one identity call, then the allowlist, then (interactively)
+// the user typing the account id back. The decision's Target is rewritten
+// to the confirmed account so the asset key, reports and every later API
+// client refer to it, and the profile moves to Labels["profile"].
+func (g *Gate) decideCloud(ctx context.Context, d *Decision, plan string) (*Decision, error) {
+	t := d.Target
+	if g.CloudIdentity == nil {
+		return nil, &RefusalError{Code: CodeCloudIdentity, Target: t.Raw, Reason: "no cloud identity confirmation available"}
+	}
+	id, err := g.CloudIdentity(ctx, t)
+	if err != nil {
+		if IsRefusal(err) {
+			return nil, err
+		}
+		return nil, &RefusalError{Code: CodeCloudIdentity, Target: t.Raw, Reason: "could not confirm the account behind these credentials: " + err.Error()}
+	}
+	if !cloudAccountRe.MatchString(id.Account) || id.Provider == "" {
+		return nil, &RefusalError{Code: CodeCloudIdentity, Target: t.Raw, Reason: "identity call returned no usable account id"}
+	}
+	d.Identity = &id
+	profile := strings.TrimPrefix(t.Value, id.Provider+"://")
+	t.Value = id.Provider + "://" + id.Account
+	if profile != "" {
+		if t.Labels == nil {
+			t.Labels = map[string]string{}
+		}
+		t.Labels["profile"] = profile
+	}
+	// consentPrompt echoes Hostname when set; the account id is what the
+	// user must type back.
+	t.Hostname = id.Account
+	d.Target = t
+	for _, a := range g.CloudAccounts {
+		if a == id.Account {
+			d.ConsentMethod = domain.ConsentCloudAllowlist
+			return d, nil
+		}
+	}
+	plan = fmt.Sprintf("You are about to scan %s account %s as %s (credentials from %s).\n%s", strings.ToUpper(id.Provider), id.Account, id.Principal, id.Source, plan)
+	return g.askConsent(ctx, d, plan, fmt.Sprintf("account %s is not in cloud.%s.accounts; add it to the scope file or confirm interactively", id.Account, id.Provider))
+}
+
+var cloudAccountRe = regexp.MustCompile(`^[0-9]{12}$`)
 
 func (g *Gate) decideCIDR(ctx context.Context, d *Decision) (*Decision, error) {
 	t := d.Target

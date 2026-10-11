@@ -9,18 +9,23 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/gerald/scnr/internal/config"
+	cloudaws "github.com/gerald/scnr/internal/engine/cloud/aws"
 	"github.com/gerald/scnr/internal/risk"
 )
 
 func (a *App) configCmd() *cobra.Command {
 	parent := &cobra.Command{Use: "config", Short: "Show or initialise configuration"}
-	var showRisk bool
+	var showRisk, awsPolicy bool
 	show := &cobra.Command{
 		Use:   "show",
-		Short: "Print the effective configuration (or --risk for scoring constants)",
+		Short: "Print the effective configuration (--risk: scoring constants; --aws-policy: minimal IAM policy for cloud scans)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if showRisk {
 				fmt.Fprint(a.Stdout, risk.Explain())
+				return nil
+			}
+			if awsPolicy {
+				fmt.Fprint(a.Stdout, cloudaws.IAMPolicyJSON())
 				return nil
 			}
 			if err := a.Open(cmd.Context()); err != nil {
@@ -41,6 +46,7 @@ func (a *App) configCmd() *cobra.Command {
 		},
 	}
 	show.Flags().BoolVar(&showRisk, "risk", false, "print the risk/posture scoring constants")
+	show.Flags().BoolVar(&awsPolicy, "aws-policy", false, "print the minimal read-only IAM policy the cloud-aws engine needs (SecurityAudit is a superset)")
 
 	initCmd := &cobra.Command{
 		Use:   "init",

@@ -71,7 +71,7 @@ func (h *harness) run(t *testing.T, args ...string) int {
 	h.stdout.Reset()
 	h.stderr.Reset()
 	app := &App{Version: "test", Home: h.home, Stdout: h.stdout, Stderr: h.stderr, Stdin: h.app.Stdin, Resolver: h.res, Redactor: h.app.Redactor,
-		OSVBase: h.app.OSVBase, KEVURL: h.app.KEVURL, EPSSURL: h.app.EPSSURL, BundleBase: h.app.BundleBase, IsTTY: h.app.IsTTY, ConfigPath: h.app.ConfigPath}
+		OSVBase: h.app.OSVBase, KEVURL: h.app.KEVURL, EPSSURL: h.app.EPSSURL, BundleBase: h.app.BundleBase, AWSEndpoint: h.app.AWSEndpoint, IsTTY: h.app.IsTTY, ConfigPath: h.app.ConfigPath}
 	code := Execute(context.Background(), app, args)
 	h.app.IsTTY = app.IsTTY
 	return code
