@@ -429,7 +429,7 @@ Secret evidence: `redacted` and `hash` only. `--show-secrets` does not exist.
 
 This section is a hard requirement; every network-touching code path goes through it and tests must be exhaustive.
 
-**Authorization acknowledgment.** Every scan requires `authorization.acknowledged: true` in `scnr.yaml` (written by `scnr scope init` after an interactive confirmation that records OS user and time) or `--ack-authorized` on the command line. The text acknowledged: "I am authorised to scan these targets and accept responsibility for doing so." Missing → exit 3.
+**Authorization acknowledgment.** Every scan requires `authorization.acknowledged: true` in `scnr.yaml` (written by `scnr scope init` after an interactive confirmation that records OS user and time) or `--ack-authorized` on the command line. The text acknowledged: "I am authorised to scan these targets and accept responsibility for doing so." On a terminal, a direct `scan TARGET` without either asks first (acceptance covers that run only, like the wizard). Missing → exit 3.
 
 **Scope file.** `scnr.yaml`:
 

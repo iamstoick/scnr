@@ -324,9 +324,15 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 		return nil, ExitRefused, err
 	}
 	interactive := !req.NonInteractive && a.IsTTY
+	acknowledged := cfg.Authorization.Acknowledged || req.AckAuthorized
+	if !acknowledged && interactive {
+		// Direct `scan TARGET` on a terminal asks the same question the
+		// wizard does; the acceptance covers this run only.
+		acknowledged = a.ackPrompt()
+	}
 	verifier := &safety.Verifier{Store: a.Store}
 	gate := &safety.Gate{
-		Scope: scope, Acknowledged: cfg.Authorization.Acknowledged || req.AckAuthorized,
+		Scope: scope, Acknowledged: acknowledged,
 		Resolver: a.Resolver, Verified: verifier.IsVerified, MaxHosts: req.MaxHosts,
 		CloudIdentity: engs.aws.Identity, CloudAccounts: cfg.Cloud.AWS.Accounts,
 	}
@@ -710,6 +716,20 @@ func (a *App) planSummary(ctx context.Context, engs []engine.Engine, t domain.Ta
 		lines = append(lines, fmt.Sprintf("  %s: %s (~%s)", e.Name(), p.Summary, p.EstDuration.Round(time.Second)))
 	}
 	return strings.Join(lines, "\n")
+}
+
+// ackPrompt asks an interactive user for the authorization acknowledgment
+// when neither scnr.yaml nor --ack-authorized provides one. Acceptance
+// covers this run only and is not recorded; declining (or unreadable
+// input) falls through to the gate, which refuses with E_ACK_REQUIRED.
+func (a *App) ackPrompt() bool {
+	fmt.Fprintf(a.Stdout, "\n%s\nType \"yes\" to confirm, or anything else to cancel: ", config.AckText)
+	rd := bufio.NewReader(a.Stdin)
+	line, err := rd.ReadString('\n')
+	if err != nil && line == "" {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(line), "yes")
 }
 
 // consentPrompt is the interactive public-target consent: show the plan,

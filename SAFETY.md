@@ -10,7 +10,9 @@ These invariants are enforced in code and tests, not by policy alone.
    `--allow-intrusive` plus consent.
 2. **Authorization is acknowledged for every scan.** `authorization.acknowledged`
    in `scnr.yaml` (written by `scnr scope init` with OS user and time) or
-   `--ack-authorized`. Missing acknowledgment exits 3 and is audited.
+   `--ack-authorized`. On a terminal, a direct `scan TARGET` without either
+   asks for it first (this run only, like the wizard); otherwise, or when
+   declined, missing acknowledgment exits 3 and is audited.
 3. **Scope deny always wins.** Allow/deny entries are checked against the
    hostname and every resolved address. Cloud metadata and credential
    endpoints (`169.254.169.254`, `169.254.170.2`, `fd00:ec2::254`,

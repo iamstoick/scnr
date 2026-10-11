@@ -608,3 +608,61 @@ func TestUsageErrors(t *testing.T) {
 		t.Fatalf("ambiguous: %d %s", code, h.stderr.String())
 	}
 }
+
+// The ack prompt accepts only an explicit "yes".
+func TestAckPrompt(t *testing.T) {
+	for _, tc := range []struct {
+		in   string
+		want bool
+	}{
+		{"yes\n", true}, {"YES\n", true}, {"  yes  \n", true},
+		{"no\n", false}, {"\n", false}, {"", false}, {"y\n", false},
+	} {
+		app := &App{Stdout: &bytes.Buffer{}, Stdin: strings.NewReader(tc.in)}
+		if got := app.ackPrompt(); got != tc.want {
+			t.Errorf("%q: got %v, want %v", tc.in, got, tc.want)
+		}
+		if out := app.Stdout.(*bytes.Buffer).String(); !strings.Contains(out, "authorised to scan") || !strings.Contains(out, `Type "yes" to confirm`) {
+			t.Errorf("prompt text: %q", out)
+		}
+	}
+}
+
+// Direct `scan TARGET` on a terminal asks for the authorization
+// acknowledgment instead of refusing outright (the wizard already did;
+// the direct path did not). Declining, or no terminal, keeps the
+// E_ACK_REQUIRED refusal. Secrets-only and offline: no network.
+func TestDirectScanPromptsForAck(t *testing.T) {
+	prompt := `Type "yes" to confirm`
+	// Decline: refused, nothing runs.
+	h := newHarness(t)
+	h.app.IsTTY = true
+	h.app.Stdin = strings.NewReader("no\n")
+	out := filepath.Join(t.TempDir(), "out")
+	if code := h.run(t, "scan", fixtureRepo(t), "--out", out, "--engines", "secrets", "--offline"); code != ExitRefused || !strings.Contains(h.stderr.String(), "E_ACK_REQUIRED") {
+		t.Fatalf("decline: %d %s", code, h.stderr.String())
+	}
+	if !strings.Contains(h.stdout.String(), prompt) {
+		t.Fatalf("decline showed no prompt: %q", h.stdout.String())
+	}
+	// Accept: the run proceeds.
+	h2 := newHarness(t)
+	h2.app.IsTTY = true
+	h2.app.Stdin = strings.NewReader("yes\n")
+	out2 := filepath.Join(t.TempDir(), "out")
+	if code := h2.run(t, "scan", fixtureRepo(t), "--out", out2, "--engines", "secrets", "--offline"); code != ExitOK {
+		t.Fatalf("accept: %d %s", code, h2.stderr.String())
+	}
+	if !strings.Contains(h2.stdout.String(), prompt) {
+		t.Fatalf("accept showed no prompt: %q", h2.stdout.String())
+	}
+	// No terminal: still refused without asking.
+	h3 := newHarness(t)
+	out3 := filepath.Join(t.TempDir(), "out")
+	if code := h3.run(t, "scan", fixtureRepo(t), "--out", out3, "--engines", "secrets", "--offline"); code != ExitRefused || !strings.Contains(h3.stderr.String(), "E_ACK_REQUIRED") {
+		t.Fatalf("non-tty: %d %s", code, h3.stderr.String())
+	}
+	if strings.Contains(h3.stdout.String(), prompt) {
+		t.Fatalf("non-tty prompted: %q", h3.stdout.String())
+	}
+}
