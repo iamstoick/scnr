@@ -1,5 +1,8 @@
 # scnr
 
+<img width="1672" height="941" alt="image" src="https://github.com/user-attachments/assets/4d85e729-70fa-479f-8949-7e423dc46a13" />
+
+
 A defensive vulnerability discovery tool. It observes and reports; it never exploits.
 
 `scnr` scans your code, dependencies, containers, infrastructure-as-code, networks, web apps, and AWS accounts, then gives you one plain-English report with a posture score — without ever running exploits, brute force, or anything that changes the target.
