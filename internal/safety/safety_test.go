@@ -63,7 +63,7 @@ func (f *fakeResolver) LookupTXT(_ context.Context, name string) ([]string, erro
 
 func mustScope(t *testing.T, allow, deny []string) *Scope {
 	t.Helper()
-	s, err := NewScope(allow, deny)
+	s, err := NewScope(allow, deny, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +196,7 @@ func TestScopeEntries(t *testing.T) {
 	if d, _ := s.Denied("db.prod.example.test", ip("203.0.113.9"), ""); !d {
 		t.Error("wildcard deny")
 	}
-	if _, err := NewScope([]string{"not a cidr/99"}, nil); err == nil {
+	if _, err := NewScope([]string{"not a cidr/99"}, nil, nil); err == nil {
 		t.Error("bad cidr accepted")
 	}
 	a := mustScope(t, []string{"b", "a"}, nil)
@@ -584,7 +584,7 @@ func TestURLPrefixEntryComponentMatch(t *testing.T) {
 			t.Errorf("legit %s refused: %v", c.url, err)
 		}
 	}
-	if _, err := NewScope([]string{"https://u:p@staging.example.com"}, nil); err == nil {
+	if _, err := NewScope([]string{"https://u:p@staging.example.com"}, nil, nil); err == nil {
 		t.Error("allow entry with credentials must be rejected at load")
 	}
 }

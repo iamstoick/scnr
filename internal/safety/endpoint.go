@@ -49,7 +49,7 @@ func NewEndpointClientPolicy(hosts []string, o HTTPOptions, p EndpointPolicy) (*
 		}
 		allow = append(allow, h)
 	}
-	scope, err := newScope(allow, nil, !p.AllowMetadata)
+	scope, err := newScope(allow, nil, nil, !p.AllowMetadata)
 	if err != nil {
 		return nil, fmt.Errorf("endpoint client: %w", err)
 	}

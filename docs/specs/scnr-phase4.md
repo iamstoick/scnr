@@ -454,6 +454,43 @@ None new (`golang.org/x/net/html` is already present).
 
 POST form submission of any kind; login-flow automation (recorded sequences, OAuth); JS-rendered SPA crawling; blind/time-based techniques; XXE/SSRF probes (they require the target to call out); WebSocket; API spec (OpenAPI) driven probing; per-parameter type inference beyond "URL-shaped".
 
+### 5.9 Implementation notes (as built)
+
+- The canary origin (`https://scnr-canary.invalid`) is exempt from
+  `AllowedPayloadRe`: the alphabet governs prober-generated marker
+  payloads, and the canary is the single fixed non-marker value (placed,
+  never followed). D1's runtime hook asserts marker-or-canary.
+- Numeric-collapse (`/items/123` → `/items/{n}`) is a second
+  crawl-frontier dedupe: collapsed repeats are not fetched. Probing
+  always targets real page URLs. Any other reading leaves fetching
+  unbounded, which contradicts the URL cap.
+- "Passive paths" seeds are the template paths that returned 2xx in the
+  passive phase (proved to exist), not every template path.
+- `robots.txt` binds discovery and extra (2xx template-path) seeds;
+  only the explicitly authorised primary seed is fetched
+  unconditionally. The destructive-word list screens every discovered
+  link and every extra seed at fetch time, while the prober re-screens
+  every page (seeds included) and never probes destructive URLs.
+- Probe requests keep the page's other parameters (fidelity; fewer
+  error-disclosure false positives). Evidence request lines show the
+  probed parameter only, and open-redirect evidence quotes the target
+  host only, so echoed discovery values never reach evidence.
+- Finding locations are value-free (`origin + path + ?param`) so the
+  random marker cannot churn fingerprints across scans.
+- `IntrusiveGate` re-checks verification live for public targets rather
+  than trusting the decision's consent-method string.
+- `scans.meta.intrusive` is written at insert (`{targets, probes: 0}`)
+  and updated with the final probe count after the engines complete.
+  Telemetry flows through an `engine.Options.Stats` callback.
+- The destructive-link inventory is capped at 500 entries (fetching is
+  unaffected — everything destructive is skipped regardless).
+- No embedded `safety: intrusive` templates ship; intrusive templates
+  come from `--templates` only.
+- Follow-ups for a later pass: spaced/underscored destructive variants
+  (`Log out`, `sign_out`) are not in the §5.3 word list (spec-literal);
+  redirect follows of probe requests are hop-bounded but not
+  budget-counted.
+
 ---
 
 ## 6. Sub-phase 4e — Plugins

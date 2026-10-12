@@ -69,9 +69,16 @@ func (e *Engine) Name() string { return Name }
 func (e *Engine) Supports(t domain.Target) bool { return t.Type == domain.TargetURL }
 
 // Templates returns the embedded set merged with the user directory (if
-// any). Intrusive templates are excluded: --allow-intrusive does not exist
-// in this phase, so only safe templates ever run.
+// any), safe templates only. Used by `templates list` and the audit row's
+// safe-set hash.
 func (e *Engine) Templates(userDir string) ([]*Template, error) {
+	return e.TemplatesForRun(userDir, false)
+}
+
+// TemplatesForRun returns the templates for a run: safe always, plus
+// safety:intrusive ones (POST ≤ 4 KiB bodies, validated at load) only
+// when the intrusive gate allowed this target.
+func (e *Engine) TemplatesForRun(userDir string, intrusive bool) ([]*Template, error) {
 	var user []*Template
 	if userDir != "" {
 		var errs []error
@@ -86,7 +93,7 @@ func (e *Engine) Templates(userDir string) ([]*Template, error) {
 	}
 	out := all[:0]
 	for _, t := range all {
-		if t.Safety == domain.SafetySafe {
+		if t.Safety == domain.SafetySafe || intrusive {
 			out = append(out, t)
 		}
 	}
@@ -118,21 +125,46 @@ func countRequests(tpls []*Template) int {
 
 // Plan implements engine.Engine.
 func (e *Engine) Plan(_ context.Context, t domain.Target, o engine.Options) (engine.Plan, error) {
-	tpls, err := e.Templates(o.TemplatesDir)
+	tpls, err := e.TemplatesForRun(o.TemplatesDir, o.Intrusive)
 	if err != nil {
 		return engine.Plan{}, err
 	}
 	n := 1 + countRequests(tpls)
+	summary := fmt.Sprintf("passive header/cookie checks on GET / plus %d safe templates (%d requests)", len(tpls), n)
+	if o.Intrusive {
+		budget := probeBudget(o.Profile.Name == "deep")
+		safe := 0
+		for _, t := range tpls {
+			if t.Safety == domain.SafetySafe {
+				safe++
+			}
+		}
+		summary = fmt.Sprintf("passive checks plus %d safe templates, then active checks (crawler + inert-marker probes, up to %d extra requests)", safe, budget)
+		n += budget
+	}
+	if o.Auth != nil {
+		summary += fmt.Sprintf("; authenticated: yes (%d headers, %d cookies)", o.Auth.HeaderCount(), o.Auth.CookieCount())
+	}
 	rps := 10
 	if o.Limiter != nil && o.Limiter.HTTPRPSPerHost > 0 {
 		rps = o.Limiter.HTTPRPSPerHost
 	}
+	summary += fmt.Sprintf(" at <= %d req/s", rps)
 	return engine.Plan{
-		Summary:     fmt.Sprintf("passive header/cookie checks on GET / plus %d safe templates (%d requests) at <= %d req/s", len(tpls), n, rps),
+		Summary:     summary,
 		EstRequests: n,
 		EstDuration: time.Duration(n/rps+1) * time.Second,
 		Network:     true,
 	}, nil
+}
+
+// probeBudget is the per-target active-request budget: 1,000, tripled
+// for the deep profile.
+func probeBudget(deep bool) int {
+	if deep {
+		return 3000
+	}
+	return 1000
 }
 
 // Run implements engine.Engine.
@@ -144,7 +176,7 @@ func (e *Engine) Run(ctx context.Context, t domain.Target, o engine.Options, emi
 	if err != nil || base.User != nil || (base.Scheme != "http" && base.Scheme != "https") {
 		return fmt.Errorf("webscan: invalid target URL")
 	}
-	tpls, err := e.Templates(o.TemplatesDir)
+	tpls, err := e.TemplatesForRun(o.TemplatesDir, o.Intrusive)
 	if err != nil {
 		return err
 	}
@@ -194,6 +226,12 @@ func (e *Engine) Run(ctx context.Context, t domain.Target, o engine.Options, emi
 		}
 		mu.Unlock()
 	}
+	// Template paths that returned 2xx become extra crawl seeds when
+	// intrusive checks run: the passive phase proved they exist.
+	var okPaths *urlSet
+	if o.Intrusive {
+		okPaths = &urlSet{m: map[string]bool{}}
+	}
 	outOfScope := 0
 	for _, tpl := range tpls {
 		for si := range tpl.HTTP {
@@ -212,7 +250,7 @@ func (e *Engine) Run(ctx context.Context, t domain.Target, o engine.Options, emi
 				go func(tpl *Template, step *Step, p, target string) {
 					defer wg.Done()
 					defer sem.Release(1)
-					if err := e.runStep(ctx, o.HTTP, tpl, step, p, target, assetKey, red, redirects, safeEmit); err != nil {
+					if err := e.runStep(ctx, o.HTTP, tpl, step, p, target, assetKey, red, redirects, okPaths, safeEmit); err != nil {
 						setErr(err)
 					}
 				}(tpl, step, p, target)
@@ -226,7 +264,144 @@ func (e *Engine) Run(ctx context.Context, t domain.Target, o engine.Options, emi
 	if firstErr != nil {
 		return firstErr
 	}
+	var stats engine.Stats
+	if o.Intrusive {
+		var err error
+		stats, err = e.runIntrusive(ctx, t, base, o, assetKey, red, okPaths.list(), safeEmit)
+		if err != nil {
+			if o.Stats != nil {
+				o.Stats(stats)
+			}
+			return err
+		}
+	}
+	if o.Stats != nil {
+		o.Stats(stats)
+	}
 	return ctx.Err()
+}
+
+// urlSet is a mutex-guarded string set for 2xx template paths.
+type urlSet struct {
+	mu sync.Mutex
+	m  map[string]bool
+}
+
+func (s *urlSet) add(u string) {
+	s.mu.Lock()
+	s.m[u] = true
+	s.mu.Unlock()
+}
+
+func (s *urlSet) list() []string {
+	if s == nil {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]string, 0, len(s.m))
+	for u := range s.m {
+		out = append(out, u)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// runIntrusive crawls from the target and probes the discovered
+// parameters with inert markers. It returns the request telemetry with
+// any error, so partial counts still reach the scan record.
+func (e *Engine) runIntrusive(ctx context.Context, t domain.Target, base *url.URL, o engine.Options, assetKey string, red *safety.Redactor, seeds []string, emit engine.EmitFunc) (engine.Stats, error) {
+	var stats engine.Stats
+	deep := o.Profile.Name == "deep"
+	crawler := &Crawler{
+		Client: o.HTTP, Scope: urlScopeFilter(base, o),
+		Limits: DefaultCrawlLimits(deep), Origin: base, Seeds: seeds, Log: o.Log,
+	}
+	var pages []Page
+	cstats, err := crawler.Crawl(ctx, base, func(p Page) error {
+		pages = append(pages, p)
+		for _, f := range p.Forms {
+			ff := e.rules.NewFinding("web.form-inventory", assetKey, formLocation(p.URL, f), domain.Confirmed)
+			ff.Title = fmt.Sprintf("POST form with %d field(s), inventoried and not submitted", len(f.Fields))
+			ff.Evidence = []domain.Evidence{red.TextEvidence("response", p.URL,
+				"action: "+f.Action+"\nfields: "+strings.Join(f.Fields, ", "))}
+			if err := emit(ff); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	stats.Crawl = cstats.Requests
+	if err != nil {
+		return stats, err
+	}
+	for _, s := range cstats.Skipped {
+		f := e.rules.NewFinding("web.state-changing-get", assetKey, s.URL, domain.Tentative)
+		detail := "never requested by the crawler"
+		if s.Text != "" {
+			detail = fmt.Sprintf("link text %q; never requested by the crawler", s.Text)
+		}
+		f.Evidence = []domain.Evidence{red.TextEvidence("response", s.URL, detail)}
+		if err := emit(f); err != nil {
+			return stats, err
+		}
+	}
+	if cstats.Truncated {
+		f := e.rules.NewFinding("web.crawl-truncated", assetKey, t.Value, domain.Confirmed)
+		f.Evidence = []domain.Evidence{red.TextEvidence("response", t.Value,
+			fmt.Sprintf("crawl stopped at a coverage cap after %d URLs and %d forms", cstats.URLs, cstats.Forms))}
+		if err := emit(f); err != nil {
+			return stats, err
+		}
+	}
+	prober := &Prober{Client: o.HTTP, Budget: probeBudget(deep), Rules: e.rules, Red: red, AssetKey: assetKey}
+	if o.Auth != nil {
+		prober.SessionCookies = o.Auth.CookieNames()
+	}
+	pstats, err := prober.Probe(ctx, pages, emit)
+	stats.Probes = pstats.Requests
+	if err != nil {
+		return stats, err
+	}
+	if pstats.Truncated {
+		f := e.rules.NewFinding("web.probe-truncated", assetKey, t.Value, domain.Confirmed)
+		f.Evidence = []domain.Evidence{red.TextEvidence("response", t.Value,
+			fmt.Sprintf("probing stopped at the request budget after %d requests", pstats.Requests))}
+		if err := emit(f); err != nil {
+			return stats, err
+		}
+	}
+	var partial []string
+	if cstats.Truncated {
+		partial = append(partial, "crawl cap")
+	}
+	if pstats.Truncated {
+		partial = append(partial, "probe budget")
+	}
+	if pstats.SessionInvalidated {
+		partial = append(partial, "session invalidated")
+	}
+	if len(partial) > 0 {
+		return stats, &engine.PartialError{Reason: strings.Join(partial, "; ")}
+	}
+	return stats, nil
+}
+
+// formLocation resolves a form action against its page for a stable
+// finding location.
+func formLocation(pageURL string, f Form) string {
+	u, err := url.Parse(pageURL)
+	if err != nil {
+		return pageURL
+	}
+	if f.Action == "" {
+		return u.Scheme + "://" + u.Host + u.Path
+	}
+	a, err := u.Parse(f.Action)
+	if err != nil {
+		return pageURL
+	}
+	return a.Scheme + "://" + a.Host + a.Path
 }
 
 // stepURL joins a validated template path onto the target origin.
@@ -286,7 +461,7 @@ func (e *Engine) fetch(ctx context.Context, client *http.Client, method, rawURL 
 	return &Response{Status: resp.StatusCode, Header: resp.Header, Body: body}, nil
 }
 
-func (e *Engine) runStep(ctx context.Context, client *http.Client, tpl *Template, step *Step, p, target, assetKey string, red *safety.Redactor, redirects *redirectTracker, emit engine.EmitFunc) error {
+func (e *Engine) runStep(ctx context.Context, client *http.Client, tpl *Template, step *Step, p, target, assetKey string, red *safety.Redactor, redirects *redirectTracker, okPaths *urlSet, emit engine.EmitFunc) error {
 	resp, err := e.fetch(ctx, client, step.Method, target, step.Headers)
 	if err != nil {
 		if r, ok := safety.AsRedirectOutOfScope(err); ok {
@@ -296,6 +471,9 @@ func (e *Engine) runStep(ctx context.Context, client *http.Client, tpl *Template
 			return err
 		}
 		return nil // connection-level failure: template does not match
+	}
+	if okPaths != nil && resp.Status >= 200 && resp.Status < 300 {
+		okPaths.add(target)
 	}
 	if !step.Matches(resp) {
 		return nil

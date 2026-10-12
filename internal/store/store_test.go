@@ -374,3 +374,41 @@ func TestOfflineLoadStagesAndRollsBack(t *testing.T) {
 		t.Fatal("meta row survived down migration")
 	}
 }
+
+// TestScanIntrusiveMetaRoundTrip: scans.meta.intrusive records the active
+// outcome ({targets, probes}), SetScanMetaValue updates the probe count
+// after the run, and GetScan parses it back. Pre-4d rows without the key
+// read back as Ran=false.
+func TestScanIntrusiveMetaRoundTrip(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	sc := sampleScan()
+	sc.Intrusive = domain.IntrusiveOutcome{Ran: true, Targets: []string{"http://127.0.0.1/"}, Probes: 0}
+	if err := s.InsertScan(ctx, sc); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetScanMetaValue(ctx, sc.ID, "intrusive", map[string]any{"targets": []string{"http://127.0.0.1/"}, "probes": 42}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetScan(ctx, sc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Intrusive.Ran || len(got.Intrusive.Targets) != 1 || got.Intrusive.Probes != 42 {
+		t.Fatalf("%+v", got.Intrusive)
+	}
+	if got.Schedule != "" {
+		t.Fatalf("schedule leaked: %q", got.Schedule)
+	}
+	plain := sampleScan()
+	if err := s.InsertScan(ctx, plain); err != nil {
+		t.Fatal(err)
+	}
+	got2, err := s.GetScan(ctx, plain.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got2.Intrusive.Ran {
+		t.Fatalf("pre-4d row reads intrusive: %+v", got2.Intrusive)
+	}
+}

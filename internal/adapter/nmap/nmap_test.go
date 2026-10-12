@@ -18,7 +18,7 @@ import (
 
 func opts(t *testing.T, public bool) engine.Options {
 	t.Helper()
-	scope, _ := safety.NewScope(nil, []string{"10.0.0.1", "10.9.0.0/16"})
+	scope, _ := safety.NewScope(nil, []string{"10.0.0.1", "10.9.0.0/16"}, nil)
 	limits, _, _ := safety.NewLimits(public, safety.LimitRequest{})
 	p, _ := engine.ProfileByName("standard")
 	d := &safety.Dialer{Scope: scope, Limits: limits}

@@ -188,23 +188,26 @@ func (e entry) overlapsPrefix(p netip.Prefix) bool {
 // private) and are the classic SSRF/redirect target.
 var BuiltinDeny = []string{"169.254.169.254", "169.254.170.2", "fd00:ec2::254", "100.100.100.200"}
 
-// Scope is the parsed allow/deny list. Deny always wins.
+// Scope is the parsed allow/deny list plus the intrusive allow list for
+// active checks. Deny always wins.
 type Scope struct {
-	allow []entry
-	deny  []entry
-	hash  string
+	allow     []entry
+	deny      []entry
+	intrusive []entry
+	hash      string
 }
 
-// NewScope parses allow and deny entries. BuiltinDeny is always appended.
-func NewScope(allow, deny []string) (*Scope, error) {
-	return newScope(allow, deny, true)
+// NewScope parses allow, deny and intrusive_allow entries. BuiltinDeny is
+// always appended. An empty intrusive list permits no active checks.
+func NewScope(allow, deny, intrusive []string) (*Scope, error) {
+	return newScope(allow, deny, intrusive, true)
 }
 
 // newScope is NewScope with the built-in deny list optional. The only
 // caller that passes builtin=false is the endpoint client for instance
 // credential lookups (EndpointPolicy.AllowMetadata); scan scopes always
 // carry it.
-func newScope(allow, deny []string, builtin bool) (*Scope, error) {
+func newScope(allow, deny, intrusive []string, builtin bool) (*Scope, error) {
 	s := &Scope{}
 	if builtin {
 		for _, d := range BuiltinDeny {
@@ -230,11 +233,20 @@ func newScope(allow, deny []string, builtin bool) (*Scope, error) {
 		}
 		s.deny = append(s.deny, e)
 	}
+	for _, in := range intrusive {
+		e, err := parseEntry(in)
+		if err != nil {
+			return nil, fmt.Errorf("scope.intrusive_allow: %w", err)
+		}
+		s.intrusive = append(s.intrusive, e)
+	}
 	al := append([]string(nil), allow...)
 	dl := append([]string(nil), deny...)
+	il := append([]string(nil), intrusive...)
 	sort.Strings(al)
 	sort.Strings(dl)
-	s.hash = domain.SHA256Hex("allow:" + strings.Join(al, ",") + "\ndeny:" + strings.Join(dl, ","))
+	sort.Strings(il)
+	s.hash = domain.SHA256Hex("allow:" + strings.Join(al, ",") + "\ndeny:" + strings.Join(dl, ",") + "\nintrusive_allow:" + strings.Join(il, ","))
 	return s, nil
 }
 
@@ -259,6 +271,23 @@ func (s *Scope) Denied(host string, ips []netip.Addr, rawURL string) (bool, stri
 // Allowed reports whether host or any ip matches an allow entry.
 func (s *Scope) Allowed(host string, ips []netip.Addr, rawURL string) bool {
 	for _, a := range s.allow {
+		if a.matches(host, netip.Addr{}, rawURL) {
+			return true
+		}
+		for _, ip := range ips {
+			if a.matches(host, ip, rawURL) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// IntrusiveAllowed reports whether host or any ip matches an
+// intrusive_allow entry. The empty list matches nothing; callers check
+// Denied first so deny still wins.
+func (s *Scope) IntrusiveAllowed(host string, ips []netip.Addr, rawURL string) bool {
+	for _, a := range s.intrusive {
 		if a.matches(host, netip.Addr{}, rawURL) {
 			return true
 		}

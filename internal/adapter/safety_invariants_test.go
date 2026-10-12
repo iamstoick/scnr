@@ -126,7 +126,7 @@ func TestArgBuildersNeverEmitForbiddenFlags(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	scope, _ := safety.NewScope(nil, nil)
+	scope, _ := safety.NewScope(nil, nil, nil)
 	for _, public := range []bool{false, true} {
 		limits, _, _ := safety.NewLimits(public, safety.LimitRequest{})
 		for _, pname := range engine.ProfileNames() {

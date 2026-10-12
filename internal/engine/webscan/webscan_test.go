@@ -206,7 +206,7 @@ func (s staticResolver) LookupIPAddr(_ context.Context, host string) ([]net.IPAd
 
 func newOpts(t *testing.T, allow []string, public bool, res safety.Resolver) (engine.Options, *safety.Dialer) {
 	t.Helper()
-	scope, err := safety.NewScope(allow, nil)
+	scope, err := safety.NewScope(allow, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,7 +360,7 @@ func TestTemplatesNeverLeaveAllowedURLPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	scope, _ := safety.NewScope([]string{"https://app.example/app"}, nil)
+	scope, _ := safety.NewScope([]string{"https://app.example/app"}, nil, nil)
 	ips := []netip.Addr{netip.MustParseAddr("203.0.113.5")}
 	d := &safety.Dialer{Scope: scope}
 	d.Pin("app.example", ips)
@@ -383,7 +383,7 @@ func TestTemplatesNeverLeaveAllowedURLPrefix(t *testing.T) {
 		t.Fatalf("expected out-of-prefix template paths to be skipped, but %d of %d requests were sent", len(rt.urls), 1+countRequests(tpls))
 	}
 	// Without a path prefix every template path is in scope and all are sent.
-	full, _ := safety.NewScope([]string{"https://app.example"}, nil)
+	full, _ := safety.NewScope([]string{"https://app.example"}, nil, nil)
 	d2 := &safety.Dialer{Scope: full}
 	d2.Pin("app.example", ips)
 	rt2 := &recordRT{}

@@ -47,6 +47,11 @@ type ScanRequest struct {
 	// Schedule names the schedule running this scan. Set by the daemon
 	// only; it is recorded on scans.meta and never comes from a flag.
 	Schedule string
+	// Phase 4d: active checks and authenticated scanning.
+	AllowIntrusive bool
+	AuthFile       string // --auth-file PATH
+	Headers        []string
+	Cookies        []string
 }
 
 // Flags renders the request as a reproducible command line.
@@ -74,6 +79,14 @@ func (r ScanRequest) Flags() string {
 	if r.AckAuthorized {
 		parts = append(parts, "--ack-authorized")
 	}
+	if r.AllowIntrusive {
+		parts = append(parts, "--allow-intrusive")
+	}
+	if r.AuthFile != "" {
+		parts = append(parts, "--auth-file", r.AuthFile)
+	}
+	// Headers and Cookies are deliberately never rendered: Flags output
+	// goes to the terminal, and values must not appear there.
 	parts = append(parts, "--non-interactive")
 	return strings.Join(parts, " ")
 }
@@ -161,6 +174,20 @@ func Run(ctx context.Context, d Deps) (ScanRequest, error) {
 			return req, ErrCancelled
 		}
 		req.AckAuthorized = true
+	}
+
+	// Step 3b: active checks (URL targets only). The gate still requires
+	// scope.intrusive_allow plus a private target or ownership proof.
+	if t.Type == domain.TargetURL {
+		active := false
+		if err := huh.NewForm(huh.NewGroup(
+			huh.NewConfirm().Title("Run active checks too?").
+				Description("Sends inert markers (scnr… plus quotes) in page parameters to find reflected input, open redirects and error pages. Up to 1000 extra requests; only runs against targets listed in scope intrusive_allow.").
+				Affirmative("Yes, probe parameters").Negative("No, passive only").Value(&active),
+		)).RunWithContext(ctx); err != nil {
+			return req, ErrCancelled
+		}
+		req.AllowIntrusive = active
 	}
 
 	// Step 4: online disclosure (SCA only).

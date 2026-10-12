@@ -147,7 +147,7 @@ func TestArgs(t *testing.T) {
 func pinnedOpts(t *testing.T, public bool, host string, addrs ...string) engine.Options {
 	t.Helper()
 	o := opts(t)
-	scope, _ := safety.NewScope([]string{host}, nil)
+	scope, _ := safety.NewScope([]string{host}, nil, nil)
 	o.Limiter, _, _ = safety.NewLimits(public, safety.LimitRequest{})
 	o.Dialer = &safety.Dialer{Scope: scope, Limits: o.Limiter}
 	var ips []netip.Addr
@@ -311,5 +311,37 @@ func TestRunWithFakeBinary(t *testing.T) {
 	var skip *engine.SkipError
 	if !errors.As(err, &skip) {
 		t.Fatalf("missing nuclei should skip: %v", err)
+	}
+}
+
+// TestNucleiArgsIgnoreAllowIntrusive (D7): --allow-intrusive changes
+// nothing in the nuclei adapter: excluded tags stay excluded and argv is
+// byte-identical with and without the option.
+func TestNucleiArgsIgnoreAllowIntrusive(t *testing.T) {
+	a := New()
+	tgt := domain.Target{Type: domain.TargetHost, Value: "10.0.0.5", Hostname: "10.0.0.5"}
+	plain := opts(t)
+	intrusive := plain
+	intrusive.Scratch = plain.Scratch
+	intrusive.Intrusive = true
+	want, err := a.Args(tgt, plain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := a.Args(tgt, intrusive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(want, "\x00") != strings.Join(got, "\x00") {
+		t.Fatalf("argv differs:\n%q\n%q", want, got)
+	}
+	joined := " " + strings.Join(got, " ") + " "
+	if !strings.Contains(joined, " -et "+ExcludedTags+" ") {
+		t.Fatalf("excluded tags changed: %v", got)
+	}
+	for _, bad := range []string{" -dast ", " -intrusive "} {
+		if strings.Contains(joined, bad) {
+			t.Fatalf("intrusive flag enabled: %v", got)
+		}
 	}
 }

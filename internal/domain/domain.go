@@ -230,6 +230,19 @@ type Scan struct {
 	ExitCode      int           `json:"exit_code"`
 	// Schedule names the schedule that ran this scan (daemon only).
 	Schedule string `json:"schedule,omitempty"`
+	// Intrusive records the active-checks (4d) outcome. Ran is false for
+	// scans that never ran intrusive checks (including every scan stored
+	// before 4d, whose meta has no intrusive key).
+	Intrusive IntrusiveOutcome `json:"intrusive"`
+}
+
+// IntrusiveOutcome is stored as scans.meta.intrusive
+// ({targets:[…], probes:n}) and shown by reports as the "Active checks
+// ran" banner.
+type IntrusiveOutcome struct {
+	Ran     bool     `json:"ran"`
+	Targets []string `json:"targets,omitempty"`
+	Probes  int      `json:"probes,omitempty"`
 }
 
 // Safety values a Rule may carry. There is deliberately no third value.

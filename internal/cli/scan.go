@@ -5,9 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -96,6 +98,10 @@ func scanFlags(f *pflag.FlagSet, req *wizard.ScanRequest, engines, skip *string,
 	f.StringVar(&req.Baseline, "baseline", "", "baseline.yaml whose findings are reported as suppressed")
 	f.StringVar(&req.Diff, "diff", "", "print new/fixed findings vs a previous scan: latest|SCAN-ID")
 	f.StringVar(&req.Templates, "templates", "", "directory of extra webscan templates (validated, safe only)")
+	f.BoolVar(&req.AllowIntrusive, "allow-intrusive", false, "run active checks (crawler + inert-marker probes) where the intrusive gate allows")
+	f.StringVar(&req.AuthFile, "auth-file", "", "YAML file with authenticated-scan headers/cookies (mode 0600, owned by you)")
+	f.StringArrayVar(&req.Headers, "header", nil, "extra request header as \"Name: value\" (repeatable; interactive use only, never scheduled)")
+	f.StringArrayVar(&req.Cookies, "cookie", nil, "extra request cookie as \"name=value\" (repeatable; interactive use only, never scheduled)")
 }
 
 // engines bundles the registry with the engines RunScan wires elsewhere.
@@ -290,6 +296,21 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 		}
 	}
 
+	// Auth material is loaded before anything else so the run redactor
+	// (with the values as literals) covers targets, plans, errors and
+	// evidence from the start. Values never appear in errors or output;
+	// only the values hash reaches the audit trail.
+	auth, err := a.loadAuthMaterial(req)
+	if err != nil {
+		return nil, ExitUsage, err
+	}
+	if auth != nil {
+		prevRed := a.Redactor
+		a.Redactor = a.Redactor.WithLiterals(auth.Values()...)
+		a.makeLogger()
+		defer func() { a.Redactor = prevRed; a.makeLogger() }()
+	}
+
 	// Targets. Raw inputs are redacted before they reach the store, audit
 	// trail, reports or stderr (defence in depth: URL credentials are
 	// already rejected by the detector).
@@ -313,7 +334,7 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 	}
 
 	// Scope, limits, gate.
-	scope, err := safety.NewScope(cfg.Scope.Allow, cfg.Scope.Deny)
+	scope, err := safety.NewScope(cfg.Scope.Allow, cfg.Scope.Deny, cfg.Scope.IntrusiveAllow)
 	if err != nil {
 		return nil, ExitUsage, err
 	}
@@ -352,16 +373,20 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 	if cfg.Online != nil && !*cfg.Online {
 		online = false
 	}
-	opts := engine.Options{Profile: profile, Limiter: limits, HTTP: httpClient, Scope: scope, Dialer: dialer, Log: a.Log, Online: online, Ports: ports, Redactor: a.Redactor, SecretKey: secretKey, TemplatesDir: req.Templates, NucleiTemplatesDir: cfg.Tools.NucleiTemplates, SemgrepRules: cfg.Tools.SemgrepRules}
+	opts := engine.Options{Profile: profile, Limiter: limits, HTTP: httpClient, Scope: scope, Dialer: dialer, Log: a.Log, Online: online, Ports: ports, Redactor: a.Redactor, SecretKey: secretKey, TemplatesDir: req.Templates, NucleiTemplatesDir: cfg.Tools.NucleiTemplates, SemgrepRules: cfg.Tools.SemgrepRules, Intrusive: req.AllowIntrusive, Auth: auth}
+	ig := &safety.IntrusiveGate{Scope: scope, Verified: verifier.IsVerified}
 
 	type planned struct {
-		t       domain.Target
-		engines []engine.Engine
-		dec     *safety.Decision
+		t         domain.Target
+		engines   []engine.Engine
+		dec       *safety.Decision
+		intrusive bool
 	}
 	var plans []planned
 	consentMethod := domain.ConsentLocal
 	var cloudIdentity *safety.CloudIdentity
+	var intrusiveTargets []string
+	intrusiveRefused := map[string]string{}
 	for i, t := range targets {
 		selected, err := reg.Select(t, profile, req.Engines, req.SkipEngines)
 		if err != nil {
@@ -394,7 +419,21 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 				_ = a.Audit.Log(ctx, audit.ActionLimitOverride, "", map[string]any{"target": t.Raw, "instance_credentials": true})
 			}
 		}
-		plans = append(plans, planned{t: t, engines: selected, dec: dec})
+		intrusive := false
+		if req.AllowIntrusive && t.Type == domain.TargetURL {
+			var reason string
+			var derr error
+			if intrusive, reason, derr = ig.Decide(ctx, dec, true); derr != nil {
+				return nil, ExitUsage, a.redactErr(derr)
+			}
+			if intrusive {
+				intrusiveTargets = append(intrusiveTargets, t.Raw)
+			} else {
+				intrusiveRefused[t.Raw] = reason
+				fmt.Fprintf(a.Stdout, "note: active checks skipped for %s: %s\n", t.Raw, reason)
+			}
+		}
+		plans = append(plans, planned{t: t, engines: selected, dec: dec, intrusive: intrusive})
 	}
 	if raised {
 		_ = a.Audit.Log(ctx, audit.ActionLimitOverride, "", map[string]any{"rate": limits.RatePerSec, "concurrency": limits.PerHostConcurrency})
@@ -404,8 +443,9 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 	scan := &domain.Scan{
 		ID: domain.NewID(), StartedAt: time.Now(), Profile: profile.Name, Targets: targets,
 		TargetSetHash: domain.TargetSetHash(targets), ScopeHash: scope.Hash(),
-		Consent:  domain.ConsentRecord{Method: consentMethod, By: audit.Actor(), At: time.Now()},
-		Schedule: req.Schedule,
+		Consent:   domain.ConsentRecord{Method: consentMethod, By: audit.Actor(), At: time.Now()},
+		Schedule:  req.Schedule,
+		Intrusive: domain.IntrusiveOutcome{Ran: len(intrusiveTargets) > 0, Targets: intrusiveTargets},
 	}
 	if err := a.Store.InsertScan(ctx, scan); err != nil {
 		return nil, ExitUsage, err
@@ -439,6 +479,7 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 	})
 	runner := &engine.Runner{Progress: a.progress}
 	engineRuns := map[string]domain.EngineRun{}
+	probesTotal := 0
 	for _, p := range plans {
 		exp := risk.ExposureFor(p.t.Type, p.dec.Public)
 		emit := func(f domain.Finding) error {
@@ -452,7 +493,26 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 			f.Risk = risk.Score(f, exp)
 			return writer.Add(f)
 		}
-		runs, err := runner.Run(ctx, p.engines, p.t, opts, emit)
+		// Per-plan options: the intrusive flag comes from the gate
+		// outcome, never the raw flag; auth (when any) binds to this
+		// plan's origin in a dedicated HTTP client.
+		popts := opts
+		popts.Intrusive = p.intrusive
+		var statMu sync.Mutex
+		var pstats engine.Stats
+		popts.Stats = func(s engine.Stats) {
+			statMu.Lock()
+			pstats.Probes += s.Probes
+			pstats.Crawl += s.Crawl
+			statMu.Unlock()
+		}
+		if auth != nil && p.t.Type == domain.TargetURL {
+			if u, uerr := url.Parse(p.t.Value); uerr == nil && (u.Scheme == "http" || u.Scheme == "https") {
+				popts.HTTP = safety.NewHTTPClient(dialer, safety.HTTPOptions{UserAgent: "scnr/" + a.Version, Auth: auth.WithOrigin(safety.OriginHostPort(u))})
+			}
+		}
+		runs, err := runner.Run(ctx, p.engines, p.t, popts, emit)
+		probesTotal += pstats.Probes
 		for _, r := range runs {
 			engineRuns[r.Name] = mergeRun(engineRuns[r.Name], r)
 		}
@@ -462,6 +522,16 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 	}
 	if err := writer.Close(); err != nil {
 		return nil, ExitUsage, fmt.Errorf("writing findings: %w", err)
+	}
+	scan.Intrusive.Probes = probesTotal
+	if scan.Intrusive.Ran {
+		tgts := scan.Intrusive.Targets
+		if tgts == nil {
+			tgts = []string{}
+		}
+		if err := a.Store.SetScanMetaValue(ctx, scan.ID, "intrusive", map[string]any{"targets": tgts, "probes": probesTotal}); err != nil {
+			return nil, ExitUsage, err
+		}
 	}
 	for _, name := range reg.Names() {
 		if r, ok := engineRuns[name]; ok {
@@ -516,7 +586,34 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 		// Source and principal only: never a key id or token.
 		detail["cloud_identity"] = map[string]any{"provider": cloudIdentity.Provider, "account": cloudIdentity.Account, "principal": cloudIdentity.Principal, "source": cloudIdentity.Source}
 	}
+	if auth != nil {
+		detail["auth"] = true
+		detail["auth_hash"] = "sha256:" + auth.ValuesHash()
+	}
+	if scan.Intrusive.Ran {
+		if ws, ok := reg.Get(webscan.Name); ok {
+			if itpls, terr := ws.(*webscan.Engine).TemplatesForRun(req.Templates, true); terr == nil {
+				n := 0
+				for _, tpl := range itpls {
+					if tpl.Safety == domain.SafetyIntrusive {
+						n++
+					}
+				}
+				detail["templates_intrusive"] = n
+			}
+		}
+	}
 	_ = a.Audit.Log(context.WithoutCancel(ctx), audit.ActionScan, scan.ID, detail)
+	if req.AllowIntrusive {
+		tgts := intrusiveTargets
+		if tgts == nil {
+			tgts = []string{}
+		}
+		_ = a.Audit.Log(context.WithoutCancel(ctx), audit.ActionIntrusive, scan.ID, map[string]any{
+			"ran": scan.Intrusive.Ran, "targets": tgts, "probes": probesTotal,
+			"refused": intrusiveRefused, "auth": auth != nil,
+		})
+	}
 
 	// Reports.
 	outDir := filepath.Join(req.Out, scan.ID)
@@ -552,6 +649,29 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 		fmt.Fprintln(a.Stdout, "POLICY PASS:", policy.Path)
 	}
 	return scan, scan.ExitCode, nil
+}
+
+// loadAuthMaterial loads --auth-file and --header/--cookie values into one
+// AuthMaterial (origin-less; RunScan binds the origin per URL target), or
+// nil when no auth was given. Errors never contain values.
+func (a *App) loadAuthMaterial(req wizard.ScanRequest) (*safety.AuthMaterial, error) {
+	var file, flags *safety.AuthMaterial
+	if req.AuthFile != "" {
+		var err error
+		if file, err = safety.LoadAuthFile(req.AuthFile); err != nil {
+			return nil, err
+		}
+	}
+	if len(req.Headers) > 0 || len(req.Cookies) > 0 {
+		var err error
+		if flags, err = safety.ParseAuthLiterals(req.Headers, req.Cookies); err != nil {
+			return nil, err
+		}
+	}
+	if file == nil && flags == nil {
+		return nil, nil
+	}
+	return safety.MergeAuth(file, flags), nil
 }
 
 type lifecycleResult struct {

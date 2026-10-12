@@ -105,13 +105,7 @@ func (a *App) Open(ctx context.Context) error {
 		a.DBPath = filepath.Join(a.Home, "scnr.db")
 	}
 	if a.Log == nil {
-		lvl := slog.LevelInfo
-		if a.Verbose {
-			lvl = slog.LevelDebug
-		}
-		// The logger and engine progress lines share stderr from concurrent
-		// goroutines; serialise them on the same mutex.
-		a.Log = logx.New(logx.Options{Level: lvl, Out: &lockedWriter{mu: &a.progressMu, w: a.Stderr}, IsTTY: a.IsTTY, Redactor: a.Redactor})
+		a.makeLogger()
 	}
 	s, err := store.Open(a.DBPath)
 	if err != nil {
@@ -128,6 +122,19 @@ func (a *App) Open(ctx context.Context) error {
 		a.loadConfig()
 	}
 	return nil
+}
+
+// makeLogger (re)builds the stderr logger against the current Redactor.
+// RunScan calls it after installing the run redactor so -v logs mask auth
+// literals, and again when restoring the base redactor.
+func (a *App) makeLogger() {
+	lvl := slog.LevelInfo
+	if a.Verbose {
+		lvl = slog.LevelDebug
+	}
+	// The logger and engine progress lines share stderr from concurrent
+	// goroutines; serialise them on the same mutex.
+	a.Log = logx.New(logx.Options{Level: lvl, Out: &lockedWriter{mu: &a.progressMu, w: a.Stderr}, IsTTY: a.IsTTY, Redactor: a.Redactor})
 }
 
 // loadConfig looks for scnr.yaml at --scope, ./scnr.yaml, then <home>/scnr.yaml.

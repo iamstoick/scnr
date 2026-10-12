@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/iamstoick/scnr/internal/domain"
@@ -14,6 +15,9 @@ import (
 // lines, adapter output and any evidence before a domain.Evidence is built.
 type Redactor struct {
 	patterns []*regexp.Regexp
+	// literals are exact values (auth material) masked wherever they
+	// appear, even when no pattern matches their shape.
+	literals []string
 }
 
 // secretKeyNames are the key names (optionally prefixed, as in
@@ -48,7 +52,8 @@ var defaultPatterns = []string{
 	`-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----`,
 	`(?i)(password|passwd|pwd|secret|api[_-]?key|token|authorization)\s*[:=]\s*['"]?[^\s'"]{6,}`,
 	`(?i)bearer\s+[A-Za-z0-9\-._~+/]+=*`,
-	`(?i)[a-z][a-z0-9+.-]*://[^/\s:@]+:[^/\s@]+@`, // user:pass@ in URLs
+	`(?i)[a-z][a-z0-9+.-]*://[^/\s:@]+:[^/\s@]+@`,               // user:pass@ in URLs
+	`(?im)^(?:cookie|set-cookie|x-api-key|x-auth-token)\s*:.*$`, // auth header lines
 }
 
 // NewRedactor builds the default redactor.
@@ -60,12 +65,32 @@ func NewRedactor() *Redactor {
 	return r
 }
 
+// WithLiterals returns a copy that also masks each exact value in s,
+// longest first so overlapping values mask fully. Empty values are
+// ignored. The receiver is unchanged, so a per-run redactor never leaks
+// literals into other runs sharing the base.
+func (r *Redactor) WithLiterals(vals ...string) *Redactor {
+	out := &Redactor{patterns: r.patterns, literals: append([]string(nil), r.literals...)}
+	for _, v := range vals {
+		if v != "" {
+			out.literals = append(out.literals, v)
+		}
+	}
+	sort.SliceStable(out.literals, func(i, j int) bool { return len(out.literals[i]) > len(out.literals[j]) })
+	return out
+}
+
 // Redact masks every match in s using Mask.
 func (r *Redactor) Redact(s string) string {
 	if s == "" {
 		return s
 	}
 	s = redactQuotedKeys(s)
+	for _, lit := range r.literals {
+		if strings.Contains(s, lit) {
+			s = strings.ReplaceAll(s, lit, Mask(lit))
+		}
+	}
 	for _, re := range r.patterns {
 		s = re.ReplaceAllStringFunc(s, func(m string) string {
 			if strings.Contains(m, "://") && strings.HasSuffix(m, "@") {

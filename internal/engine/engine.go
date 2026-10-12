@@ -43,6 +43,26 @@ type Options struct {
 	// --config (scnr.yaml tools.semgrep_rules). Empty means the registry
 	// pack p/default, which semgrep fetches from semgrep.dev.
 	SemgrepRules string
+	// Intrusive permits active checks (4d) for this target. Set per plan
+	// by RunScan from the IntrusiveGate outcome, never from the flag
+	// alone.
+	Intrusive bool
+	// Auth carries authenticated-scan credentials. The HTTP client's
+	// transport applies them to the authorised origin only.
+	Auth *safety.AuthMaterial
+	// Stats, when non-nil, receives the engine's run telemetry once per
+	// Run call. RunScan collects it for the scan record and report
+	// banner. Called synchronously; implementations must not block long.
+	Stats func(Stats)
+}
+
+// Stats is an engine's run telemetry: requests beyond the engine's
+// passive baseline, split by class.
+type Stats struct {
+	// Probes counts active probe requests (DAST).
+	Probes int
+	// Crawl counts crawler discovery fetches (DAST).
+	Crawl int
 }
 
 // Plan sizes the work before consent.

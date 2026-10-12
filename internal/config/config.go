@@ -30,10 +30,12 @@ type Authorization struct {
 // AckText is the exact statement a user acknowledges.
 const AckText = "I am authorised to scan these targets and accept responsibility for doing so."
 
-// Scope lists allow/deny entries. Deny always wins.
+// Scope lists allow/deny entries plus the intrusive allow list for active
+// checks. Deny always wins.
 type Scope struct {
-	Allow []string `yaml:"allow"`
-	Deny  []string `yaml:"deny"`
+	Allow          []string `yaml:"allow"`
+	Deny           []string `yaml:"deny"`
+	IntrusiveAllow []string `yaml:"intrusive_allow"`
 }
 
 // Limits are rate/concurrency caps. Zero means "use the default for the

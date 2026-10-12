@@ -12,6 +12,7 @@ import (
 
 	"github.com/iamstoick/scnr/internal/audit"
 	"github.com/iamstoick/scnr/internal/config"
+	"github.com/iamstoick/scnr/internal/domain"
 	"github.com/iamstoick/scnr/internal/safety"
 )
 
@@ -64,7 +65,7 @@ func (a *App) scopeCmd() *cobra.Command {
 			if err != nil {
 				return exitf(ExitUsage, "%v", err)
 			}
-			scope, err := safety.NewScope(a.Config.Scope.Allow, a.Config.Scope.Deny)
+			scope, err := safety.NewScope(a.Config.Scope.Allow, a.Config.Scope.Deny, a.Config.Scope.IntrusiveAllow)
 			if err != nil {
 				return exitf(ExitUsage, "%v", err)
 			}
@@ -83,6 +84,18 @@ func (a *App) scopeCmd() *cobra.Command {
 				return nil
 			}
 			fmt.Fprintf(w, "decision: ALLOW (consent method %s, %d host(s))\n", dec.ConsentMethod, dec.HostCount)
+			if t.Type == domain.TargetURL {
+				ig := &safety.IntrusiveGate{Scope: scope, Verified: verifier.IsVerified}
+				ok, reason, err := ig.Decide(ctx, dec, true)
+				switch {
+				case err != nil:
+					fmt.Fprintf(w, "intrusive: ERROR %v\n", err)
+				case ok:
+					fmt.Fprintln(w, "intrusive: ALLOW with --allow-intrusive")
+				default:
+					fmt.Fprintf(w, "intrusive: SKIP with --allow-intrusive — %s\n", reason)
+				}
+			}
 			return nil
 		},
 	}

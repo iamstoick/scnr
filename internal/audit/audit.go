@@ -34,6 +34,7 @@ const (
 	ActionBundleVerify    = "db_bundle_verify"
 	ActionSchedule        = "schedule"
 	ActionScheduleSkipped = "schedule_skipped"
+	ActionIntrusive       = "intrusive"
 )
 
 // Writer appends audit entries.

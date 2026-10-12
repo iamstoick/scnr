@@ -25,7 +25,7 @@ import (
 
 func testOptions(t *testing.T, ports []int) engine.Options {
 	t.Helper()
-	scope, err := safety.NewScope(nil, nil)
+	scope, err := safety.NewScope(nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -354,7 +354,7 @@ func TestTLSProbesUseSafeDialer(t *testing.T) {
 			tlsPorts[port] = true
 			defer delete(tlsPorts, port)
 			res := &rebindResolver{host: "localhost", first: []string{"127.0.0.1"}, then: []string{rebindTo}, flipAfter: 1}
-			scope, _ := safety.NewScope(nil, nil)
+			scope, _ := safety.NewScope(nil, nil, nil)
 			limits, _, _ := safety.NewLimits(false, safety.LimitRequest{})
 			d := &safety.Dialer{Scope: scope, Resolver: res, Limits: limits}
 			d.Pin("localhost", []netip.Addr{netip.MustParseAddr("127.0.0.1")})

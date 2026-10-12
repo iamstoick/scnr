@@ -300,3 +300,19 @@ These invariants are enforced in code and tests, not by policy alone.
     URL reaches no error, log, or audit row.
     *Residual:* schedules execute whatever argv passed validation at
     add time — review stored rows (`schedule show`) like any automation.
+19. **Active checks are inert, GET/HEAD, opt-in and never for unverified
+    public targets.** Payloads match `^scnr[0-9a-f]{12}('"<)?$`
+    (the sole exception is the fixed `scnr-canary.invalid` origin placed,
+    never followed, for open-redirect detection); nothing is submitted by
+    POST except ≤ 4 KiB intrusive templates; URLs with state-changing
+    words are never fetched; `--allow-intrusive` requires
+    `scope.intrusive_allow` and a private target or ownership
+    verification; nuclei's argv is unchanged by the flag. Auth material
+    is applied only to the authorised origin and masked everywhere as a
+    literal.
+    *Residual:* redirect follows of probe requests are bounded by the
+    client's 5-hop cap but not counted against the probe budget; a logout
+    whose wording is not in the destructive-word list ends the probe
+    phase via the session tripwire rather than being skipped in advance;
+    GET-only crawling still assumes the app honors GET semantics outside
+    the word list.

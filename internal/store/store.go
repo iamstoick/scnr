@@ -260,6 +260,13 @@ func (s *Store) insertScan(ctx context.Context, tx *sql.Tx, sc *domain.Scan) err
 	if sc.Schedule != "" {
 		meta["schedule"] = sc.Schedule
 	}
+	if sc.Intrusive.Ran {
+		targets := sc.Intrusive.Targets
+		if targets == nil {
+			targets = []string{}
+		}
+		meta["intrusive"] = map[string]any{"targets": targets, "probes": sc.Intrusive.Probes}
+	}
 	_, err := tx.ExecContext(ctx, `INSERT INTO scans(id, started_at, profile, target_set_hash, scope_hash, consent_method, consent_by, partial, meta)
 		VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`,
 		sc.ID, fmtTime(sc.StartedAt), sc.Profile, sc.TargetSetHash, sc.ScopeHash, sc.Consent.Method, sc.Consent.By,
@@ -297,6 +304,31 @@ func (s *Store) finishScan(ctx context.Context, tx *sql.Tx, sc *domain.Scan) err
 	return nil
 }
 
+// SetScanMetaValue merges one key into scans.meta, preserving the rest.
+// RunScan uses it to record the final intrusive probe count after the
+// engines complete.
+func (s *Store) SetScanMetaValue(ctx context.Context, id, key string, value any) error {
+	var cur sql.NullString
+	if err := s.db.QueryRowContext(ctx, `SELECT meta FROM scans WHERE id = ?`, id).Scan(&cur); err != nil {
+		return fmt.Errorf("read scan meta: %w", err)
+	}
+	m := map[string]any{}
+	if cur.Valid && cur.String != "" {
+		if err := json.Unmarshal([]byte(cur.String), &m); err != nil {
+			return fmt.Errorf("parse scan meta: %w", err)
+		}
+	}
+	m[key] = value
+	b, err := json.Marshal(m)
+	if err != nil {
+		return fmt.Errorf("encode scan meta: %w", err)
+	}
+	if _, err := s.db.ExecContext(ctx, `UPDATE scans SET meta = ? WHERE id = ?`, string(b), id); err != nil {
+		return fmt.Errorf("write scan meta: %w", err)
+	}
+	return nil
+}
+
 // GetScan loads a scan with targets and engines. id may be "latest".
 func (s *Store) GetScan(ctx context.Context, id string) (*domain.Scan, error) {
 	if id == "latest" {
@@ -324,6 +356,19 @@ func (s *Store) GetScan(ctx context.Context, id string) (*domain.Scan, error) {
 		var m map[string]any
 		if err := json.Unmarshal([]byte(meta.String), &m); err == nil {
 			sc.Schedule, _ = m["schedule"].(string)
+			if im, ok := m["intrusive"].(map[string]any); ok {
+				sc.Intrusive.Ran = true
+				if ts, ok := im["targets"].([]any); ok {
+					for _, v := range ts {
+						if s, ok := v.(string); ok {
+							sc.Intrusive.Targets = append(sc.Intrusive.Targets, s)
+						}
+					}
+				}
+				if p, ok := im["probes"].(float64); ok {
+					sc.Intrusive.Probes = int(p)
+				}
+			}
 		}
 	}
 	sc.StartedAt = parseTime(started.String)

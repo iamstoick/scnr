@@ -332,7 +332,9 @@ func TestMarkFixedIgnoresPartialEngines(t *testing.T) {
 		t.Fatalf("after partial run 2 the finding must stay open: %+v", fs)
 	}
 	// Unit-level: okEngines never lists a partial or skipped engine.
-	ok := okEngines([]domain.EngineRun{{Name: "a", Status: "ok"}, {Name: "b", Status: "partial: budget"}, {Name: "c", Status: "skipped: x"}, {Name: "d", Status: "failed"}})
+	// (D9: a truncated crawl reports "partial: crawl cap" and is
+	// excluded the same way, so its findings stay open.)
+	ok := okEngines([]domain.EngineRun{{Name: "a", Status: "ok"}, {Name: "b", Status: "partial: budget"}, {Name: "c", Status: "skipped: x"}, {Name: "d", Status: "failed"}, {Name: "webscan", Status: "partial: crawl cap"}})
 	if len(ok) != 1 || ok[0] != "a" {
 		t.Fatalf("okEngines: %v", ok)
 	}

@@ -246,6 +246,9 @@ const MaxRedirects = 5
 type HTTPOptions struct {
 	Timeout   time.Duration
 	UserAgent string
+	// Auth, when non-nil, is applied per request by the transport — but
+	// only to requests targeting Auth.Origin (see AuthMaterial.Apply).
+	Auth *AuthMaterial
 }
 
 // NewHTTPClient returns a client whose every connection (including each
@@ -270,7 +273,7 @@ func NewHTTPClient(d *Dialer, o HTTPOptions) *http.Client {
 	}
 	return &http.Client{
 		Timeout:   o.Timeout,
-		Transport: &limitedTransport{rt: tr, dialer: d, ua: o.UserAgent},
+		Transport: &limitedTransport{rt: tr, dialer: d, ua: o.UserAgent, auth: o.Auth},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if d.RefuseRedirects {
 				return http.ErrUseLastResponse
@@ -294,6 +297,7 @@ type limitedTransport struct {
 	rt     http.RoundTripper
 	dialer *Dialer
 	ua     string
+	auth   *AuthMaterial
 }
 
 func (t *limitedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -308,6 +312,9 @@ func (t *limitedTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	if req.Header.Get("User-Agent") == "" {
 		req.Header.Set("User-Agent", t.ua)
 	}
+	// Auth applies only to the authorised origin; redirects elsewhere
+	// travel without credentials. The dialer already checked this URL.
+	t.auth.Apply(req)
 	return t.rt.RoundTrip(req)
 }
 

@@ -193,3 +193,39 @@ func TestWriteAll(t *testing.T) {
 		t.Fatalf("symlink target was overwritten: %q", b)
 	}
 }
+
+// TestIntrusiveBanner: the HTML report shows "Active checks ran" with the
+// probe count when intrusive checks ran, and the JSON report carries
+// scan.intrusive. Absent otherwise.
+func TestIntrusiveBanner(t *testing.T) {
+	s, sc := seed(t)
+	sc.Intrusive = domain.IntrusiveOutcome{Ran: true, Targets: []string{"http://127.0.0.1/"}, Probes: 17}
+	var html bytes.Buffer
+	if err := (&HTML{Meta: Meta{Version: "test"}}).Write(context.Background(), s.Iterate(sc.ID), sc, &html); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(html.String(), "Active checks ran") || !strings.Contains(html.String(), "17 probe requests") {
+		t.Fatal("banner missing")
+	}
+	var js bytes.Buffer
+	if err := (&JSON{Meta: Meta{Version: "test"}}).Write(context.Background(), s.Iterate(sc.ID), sc, &js); err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Scan domain.Scan `json:"scan"`
+	}
+	if err := json.Unmarshal(js.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if !doc.Scan.Intrusive.Ran || doc.Scan.Intrusive.Probes != 17 {
+		t.Fatalf("%+v", doc.Scan.Intrusive)
+	}
+	s2, sc2 := seed(t)
+	var html2 bytes.Buffer
+	if err := (&HTML{Meta: Meta{Version: "test"}}).Write(context.Background(), s2.Iterate(sc2.ID), sc2, &html2); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(html2.String(), "Active checks ran") {
+		t.Fatal("banner without intrusive run")
+	}
+}

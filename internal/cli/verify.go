@@ -36,7 +36,7 @@ func (a *App) verifyCmd() *cobra.Command {
 					return nil
 				}
 			}
-			scope, err := safety.NewScope(append(a.Config.Scope.Allow, host), a.Config.Scope.Deny)
+			scope, err := safety.NewScope(append(a.Config.Scope.Allow, host), a.Config.Scope.Deny, nil)
 			if err != nil {
 				return err
 			}

@@ -27,6 +27,7 @@
   </ul>
   {{if .KEVOpen}}<p class="warn">An open finding is on CISA's Known Exploited Vulnerabilities list; the grade is capped at D until it is fixed.</p>{{end}}
   {{if .Partial}}<p class="warn">Some engines did not run or failed; see Coverage below. The score only reflects what ran.</p>{{end}}
+  {{if .Scan.Intrusive.Ran}}<p class="warn">Active checks ran: {{.Scan.Intrusive.Probes}} probe requests against {{len .Scan.Intrusive.Targets}} target(s).</p>{{end}}
   {{if not .ExploitData}}<p class="muted">Exploit data unavailable (KEV/EPSS not loaded); run <code>scnr db update</code> for exploit-aware scoring.</p>{{end}}
 </section>
 

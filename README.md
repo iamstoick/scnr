@@ -164,6 +164,24 @@ scnr templates list
 scnr templates validate ./my-templates
 ```
 
+### Actively probe a web app (DAST)
+
+Active checks crawl your app and send inert markers to find reflected
+input, open redirects and error disclosure. Opt-in per target: add it to
+`scope.intrusive_allow`, and public targets need ownership verification —
+interactive consent alone is not enough.
+
+```sh
+# Private app (needs intrusive_allow: [10.0.0.0/8] in scnr.yaml)
+scnr scan https://app.internal/ --allow-intrusive --ack-authorized
+
+# Authenticated scan (auth.yaml is chmod 600, owned by you)
+scnr scan https://app.internal/ --allow-intrusive --auth-file ./auth.yaml
+
+# Explain the gate for a target before scanning
+scnr scope check https://app.example/
+```
+
 ### Prove you own a public target
 
 Public addresses need proof: interactive consent (type the target back) or a 30-day ownership verification.

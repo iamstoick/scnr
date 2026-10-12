@@ -101,3 +101,97 @@ why: Nothing was scanned at the destination. If the destination is yours, add it
 fix: Review the redirect target; if it should be in scope, add it to scnr.yaml and scan it explicitly.
 safety: safe
 tags: [web, scope]
+---
+id: web.reflected-input
+engine: webscan
+title: User input is reflected into the page without encoding (possible XSS)
+severity: medium
+cwe: CWE-79
+what: A probe value sent in a page parameter came back in the HTML unescaped, in a text or attribute context.
+why: When an application echoes request parameters into HTML without encoding them, an attacker can often inject script that runs in other users' browsers (cross-site scripting).
+fix: HTML-encode every value interpolated into the page (or build pages with a framework that escapes by default), and deploy a Content-Security-Policy as defence in depth.
+safety: intrusive
+tags: [web, xss, active]
+---
+id: web.reflected-input-escaped
+engine: webscan
+title: Probe value reflected with encoding applied
+severity: info
+what: A probe value sent in a page parameter came back in the response with its quotes encoded, so it cannot break out of its HTML context.
+why: "This is the safe outcome: the application encodes the value before echoing it. Recorded so the probe coverage is visible."
+fix: No action needed.
+safety: intrusive
+tags: [web, xss, active]
+---
+id: web.open-redirect
+engine: webscan
+title: Open redirect through a request parameter
+severity: medium
+cwe: CWE-601
+what: Setting a redirect-shaped parameter to an external canary host made the server redirect there.
+why: Attackers abuse open redirects to make phishing links look trustworthy (the visible domain is yours, the landing page is theirs) and to steal OAuth tokens passed through redirect URLs.
+fix: Redirect only to relative paths or to a fixed allow list of destinations; never to a raw request parameter.
+safety: intrusive
+tags: [web, redirect, active]
+---
+id: web.error-disclosure
+engine: webscan
+title: Detailed error message discloses internals
+severity: low
+cwe: CWE-209
+what: A request carrying a single quote character in a parameter produced a server error or a database/framework error signature in the response.
+why: Stack traces and database errors reveal software versions, paths and query structure that help an attacker tune a real injection attack. The 500 itself may also mean the input broke the page.
+fix: Return a generic error page (no trace, no SQL text) and log the details server-side; use parameterised queries throughout.
+safety: intrusive
+tags: [web, errors, active]
+---
+id: web.state-changing-get
+engine: webscan
+title: A GET link appears to change state
+severity: info
+cwe: CWE-352
+what: A crawlable link whose URL or text names a state-changing action (logout, delete, publish, …) was inventoried and deliberately never requested.
+why: "Actions reachable by GET can be triggered by anything that loads a URL: a prefetcher, a chat preview, or an attacker's hidden image (cross-site request forgery). scnr does not touch such links; this finding asks a human to check they require POST with a CSRF token."
+fix: Move state-changing actions behind POST (or another non-idempotent method) with per-session CSRF tokens; keep GET side-effect free.
+safety: intrusive
+tags: [web, csrf, active]
+---
+id: web.form-inventory
+engine: webscan
+title: POST form inventoried, never submitted
+severity: info
+what: A form with method=post was found during the crawl. scnr records its action and field names only and never submits it.
+why: Submitting forms can create, change or delete data, so active scans only inventory them. Review the list for forms that lack CSRF protection or handle sensitive data.
+fix: No action needed for the scan; ensure each form requires a per-session CSRF token.
+safety: intrusive
+tags: [web, forms, active]
+---
+id: web.crawl-truncated
+engine: webscan
+title: Crawl stopped at a coverage cap
+severity: info
+what: The crawler hit a budget (depth, URL count, form count or parameter-pair count) and stopped discovering new pages.
+why: "Coverage is partial: pages beyond the cap were not crawled or probed, so findings from this engine cannot vouch for their absence."
+fix: Re-run with --profile deep for doubled crawl budgets, or narrow the target to the section you care about.
+safety: intrusive
+tags: [web, coverage, active]
+---
+id: web.probe-truncated
+engine: webscan
+title: Probing stopped at the request budget
+severity: info
+what: Active probing hit the per-target request budget and stopped; remaining parameters were not probed.
+why: "Coverage is partial: unprobed parameters may still reflect input or redirect. Findings from this engine cannot vouch for their absence."
+fix: Re-run with --profile deep for a tripled probe budget, or narrow the target to the section you care about.
+safety: intrusive
+tags: [web, coverage, active]
+---
+id: web.session-invalidated
+engine: webscan
+title: Authenticated session was cleared mid-scan
+severity: info
+what: The server cleared the authenticated session cookie during probing, so the probe phase stopped rather than continue unauthenticated.
+why: Coverage after this point is partial, and results would mix authenticated and anonymous behaviour. The crawl may have visited a logout-shaped page that the destructive-word list did not catch — please report it.
+fix: Re-run; if it recurs, check for logout links whose wording is not in the destructive-word list.
+safety: intrusive
+tags: [web, auth, active]
