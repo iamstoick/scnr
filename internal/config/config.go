@@ -112,6 +112,20 @@ type VulnDB struct {
 	TrustedKeys []string `yaml:"trusted_keys,omitempty"`
 }
 
+// Plugins configures third-party plugin checks (Phase 4e).
+type Plugins struct {
+	// RequireSignature refuses unsigned plugin installs. Default true;
+	// nil means unset.
+	RequireSignature *bool `yaml:"require_signature,omitempty"`
+	// TrustedKeys are ed25519 public keys ("ed25519:<base64>", as
+	// printed by `scnr db keygen`) whose plugin manifest signatures are
+	// accepted.
+	TrustedKeys []string `yaml:"trusted_keys,omitempty"`
+	// Sandbox is "required" (default) or "best-effort": whether a plugin
+	// run without an OS sandbox wrapper is skipped or merely audited.
+	Sandbox string `yaml:"sandbox,omitempty"`
+}
+
 // Config is the whole scnr.yaml.
 type Config struct {
 	Authorization Authorization `yaml:"authorization"`
@@ -120,6 +134,7 @@ type Config struct {
 	Tools         Tools         `yaml:"tools,omitempty"`
 	VulnDB        VulnDB        `yaml:"vulndb,omitempty"`
 	Cloud         Cloud         `yaml:"cloud,omitempty"`
+	Plugins       Plugins       `yaml:"plugins,omitempty"`
 	Online        *bool         `yaml:"online,omitempty"`
 	Path          string        `yaml:"-"`
 }
@@ -226,6 +241,14 @@ func (c *Config) Validate() error {
 		if !awsRegionRe.MatchString(r) {
 			return fmt.Errorf("cloud.aws.regions: %q is not a region name", r)
 		}
+	}
+	for _, k := range c.Plugins.TrustedKeys {
+		if !strings.HasPrefix(k, "ed25519:") || len(k) > 128 {
+			return fmt.Errorf("plugins.trusted_keys: %q must be ed25519:<base64> (from `scnr db keygen`)", k)
+		}
+	}
+	if s := c.Plugins.Sandbox; s != "" && s != "required" && s != "best-effort" {
+		return fmt.Errorf("plugins.sandbox: %q must be \"required\" or \"best-effort\"", s)
 	}
 	return nil
 }

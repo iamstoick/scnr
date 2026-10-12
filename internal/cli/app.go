@@ -211,7 +211,7 @@ func (a *App) Root() *cobra.Command {
 
 	root.AddCommand(a.scanCmd(), a.doctorCmd(), a.reportCmd(), a.findingsCmd(), a.assetsCmd(), a.scopeCmd(), a.verifyCmd(), a.dbCmd(), a.configCmd(), a.versionCmd(),
 		a.acceptCmd(), a.baselineCmd(), a.policyCmd(), a.templatesCmd(), a.sbomCmd(),
-		a.scheduleCmd(), a.daemonCmd())
+		a.scheduleCmd(), a.daemonCmd(), a.pluginCmd())
 	return root
 }
 

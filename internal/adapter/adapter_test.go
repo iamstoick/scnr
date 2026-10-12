@@ -3,6 +3,7 @@ package adapter
 import (
 	"context"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -73,5 +74,41 @@ func TestCappedWriterAndTail(t *testing.T) {
 	}
 	if CompareVersions("7.94", "7.80") != 1 || CompareVersions("3.1.0", "3.1") != 0 || CompareVersions("1.9", "1.10") != -1 {
 		t.Fatal("CompareVersions")
+	}
+}
+
+// A timed-out child that forked a grandchild must not hold Exec open:
+// the grandchild inherits the stdout pipe, so only a group kill lets
+// the copy finish. (Unix: Setpgid is a no-op on Windows.)
+func TestExecTimeoutKillsProcessGroup(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process groups are Unix-only")
+	}
+	b := &Base{BinaryName: "sh", Setpgid: true}
+	b.UsePath("/bin/sh", "test")
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	_, err := b.Exec(ctx, t.TempDir(), []string{"-c", "exec /bin/sleep 30"}, 5*time.Second)
+	if err == nil || !strings.Contains(err.Error(), "timed out") {
+		t.Fatalf("err = %v", err)
+	}
+	// exec replaces the shell, so this is the plain-child case. The
+	// grandchild case below is the one that used to stall.
+	if d := time.Since(start); d > 10*time.Second {
+		t.Fatalf("Exec returned after %v", d)
+	}
+
+	b2 := &Base{BinaryName: "sh", Setpgid: true}
+	b2.UsePath("/bin/sh", "test")
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel2()
+	start = time.Now()
+	_, err = b2.Exec(ctx2, t.TempDir(), []string{"-c", "/bin/sleep 30"}, 5*time.Second)
+	if err == nil || !strings.Contains(err.Error(), "timed out") {
+		t.Fatalf("grandchild err = %v", err)
+	}
+	if d := time.Since(start); d > 10*time.Second {
+		t.Fatalf("Exec with grandchild returned after %v", d)
 	}
 }

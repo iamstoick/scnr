@@ -34,6 +34,7 @@ import (
 	"github.com/iamstoick/scnr/internal/engine/sca"
 	"github.com/iamstoick/scnr/internal/engine/secrets"
 	"github.com/iamstoick/scnr/internal/engine/webscan"
+	"github.com/iamstoick/scnr/internal/plugin"
 	"github.com/iamstoick/scnr/internal/report"
 	"github.com/iamstoick/scnr/internal/risk"
 	"github.com/iamstoick/scnr/internal/safety"
@@ -109,6 +110,8 @@ type engines struct {
 	reg *engine.Registry
 	ns  *netscan.Engine
 	aws *cloudaws.Engine
+	// pluginEvents carries plugin integrity rows to the audit trail.
+	pluginEvents []plugin.LoadEvent
 }
 
 // engineRegistry builds the native engines plus the adapters.
@@ -169,7 +172,15 @@ func (a *App) engineRegistry() (*engines, error) {
 	for _, ad := range adapters {
 		reg.Register(ad)
 	}
-	return &engines{reg: reg, ns: ns, aws: aws}, nil
+	var pluginEvents []plugin.LoadEvent
+	pengines, err := a.pluginEngines(&pluginEvents)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range pengines {
+		reg.Register(e)
+	}
+	return &engines{reg: reg, ns: ns, aws: aws, pluginEvents: pluginEvents}, nil
 }
 
 // cloudConfig is cloud.aws from the scope file (empty before Open).
@@ -260,6 +271,9 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 		return nil, ExitUsage, err
 	}
 	reg := engs.reg
+	for _, ev := range engs.pluginEvents {
+		_ = a.Audit.Log(context.WithoutCancel(ctx), ev.Action, "", ev.Detail)
+	}
 	ports, err := engs.ns.ParsePorts(req.Ports)
 	if err != nil {
 		return nil, ExitUsage, err
@@ -581,6 +595,25 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 	}
 	if policy != nil {
 		detail["policy"] = map[string]any{"path": policy.Path, "violations": violations}
+	}
+	// Every plugin engine that ran (or skipped) is recorded with its
+	// sandbox, so best-effort unsandboxed runs are audited per scan.
+	var plugins []map[string]any
+	for _, name := range reg.Names() {
+		if !strings.HasPrefix(name, "plugin:") {
+			continue
+		}
+		if e, ok := reg.Get(name); ok {
+			if pi, ok := e.(interface {
+				PluginInfo() (string, string, string)
+			}); ok {
+				n, v, s := pi.PluginInfo()
+				plugins = append(plugins, map[string]any{"name": n, "version": v, "sandbox": s})
+			}
+		}
+	}
+	if len(plugins) > 0 {
+		detail["plugins"] = plugins
 	}
 	if cloudIdentity != nil {
 		// Source and principal only: never a key id or token.

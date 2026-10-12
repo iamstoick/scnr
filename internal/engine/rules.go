@@ -52,7 +52,7 @@ func LoadRules(fsys fs.FS, dir, engine string) (RuleSet, error) {
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", e.Name(), err)
 			}
-			if err := validateRule(r, engine); err != nil {
+			if err := ValidateRule(r, engine); err != nil {
 				return nil, fmt.Errorf("%s: %w", e.Name(), err)
 			}
 			if _, dup := rs[r.ID]; dup {
@@ -64,7 +64,10 @@ func LoadRules(fsys fs.FS, dir, engine string) (RuleSet, error) {
 	return rs, nil
 }
 
-func validateRule(r domain.Rule, engine string) error {
+// ValidateRule checks one rule against the engine contract: id shape,
+// engine match, known severity, required prose, safety value. Exported
+// so plugin manifests are held to the same contract.
+func ValidateRule(r domain.Rule, engine string) error {
 	if !RuleIDPattern.MatchString(r.ID) {
 		return fmt.Errorf("bad rule id %q", r.ID)
 	}

@@ -1,0 +1,28 @@
+{
+  "protocol": 1,
+  "name": "license-check",
+  "version": "1.0.0",
+  "description": "Flags npm packages without a license field and repositories without a LICENSE file.",
+  "homepage": "https://github.com/iamstoick/scnr",
+  "supports": ["path"],
+  "safety": "safe",
+  "capabilities": {"network": "none", "filesystem": "target-readonly"},
+  "rules": [
+    {
+      "id": "unlicensed-package",
+      "title": "npm package without a license field",
+      "severity": "low",
+      "what": "A package.json has no usable license field.",
+      "why": "Unlicensed dependencies create legal uncertainty about redistribution.",
+      "fix": "Add an SPDX license expression to the package.json license field."
+    },
+    {
+      "id": "missing-license-file",
+      "title": "No LICENSE file at the repository root",
+      "severity": "info",
+      "what": "The scanned root has no LICENSE file.",
+      "why": "Consumers look for a top-level license to understand their rights.",
+      "fix": "Add a LICENSE file with the project's license text."
+    }
+  ]
+}

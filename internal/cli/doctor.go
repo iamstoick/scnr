@@ -34,7 +34,7 @@ func (a *App) doctorCmd() *cobra.Command {
 			for _, ad := range adapters {
 				detectors[ad.Binary()] = ad
 			}
-			opts := doctor.Options{Home: a.Home, ConfigPath: a.ConfigPath, Store: a.Store, Online: online, Adapters: detectors, Extra: append(a.cloudChecks(cmd.Context()), a.daemonChecks(cmd.Context())...)}
+			opts := doctor.Options{Home: a.Home, ConfigPath: a.ConfigPath, Store: a.Store, Online: online, Adapters: detectors, Extra: append(append(a.cloudChecks(cmd.Context()), a.daemonChecks(cmd.Context())...), a.pluginChecks()...)}
 			if online {
 				// Reachability probes go through the same endpoint-restricted
 				// client as the real fetches (SAFETY.md item 9).

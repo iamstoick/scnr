@@ -64,18 +64,42 @@ type Base struct {
 	// SetEnv lists KEY=VALUE pairs always set for the child, after the
 	// pass-through variables (so they win): tool knobs that only exist as
 	// environment variables, such as grype's DB auto-update switch.
-	SetEnv  []string
+	SetEnv []string
+	// Path, when set, is the tool executable: Detect skips LookPath and
+	// uses it directly (plugins pin their verified binary).
+	Path string
+	// Stdin, when non-nil, is fed to the child's stdin. An io.Closer is
+	// closed after the run.
+	Stdin io.Reader
+	// Setpgid starts the child in a new process group and kills the
+	// whole group (not just the child) on timeout or output-cap kill,
+	// so forked grandchildren cannot outlive the run. Unix only; a
+	// no-op on Windows.
+	Setpgid bool
+	// Wrapper, when non-empty, prefixes the child argv (sandbox wrapper
+	// plus its flags): the executed program is Wrapper[0], followed by
+	// the tool path and tool args. Forbidden-flag checks apply to the
+	// full argv.
+	Wrapper []string
+
 	path    string
 	version string
 }
 
-// Detect finds the binary on PATH and parses its version.
+// Detect finds the binary on PATH and parses its version. When Path is
+// set the lookup is skipped and that executable is used directly.
 func (b *Base) Detect(ctx context.Context) (ToolInfo, error) {
-	p, err := exec.LookPath(b.BinaryName)
-	if err != nil {
-		return ToolInfo{Reason: "not found on PATH"}, nil
+	p := b.Path
+	if p == "" {
+		var err error
+		p, err = exec.LookPath(b.BinaryName)
+		if err != nil {
+			return ToolInfo{Reason: "not found on PATH"}, nil
+		}
+	} else if _, err := os.Stat(p); err != nil {
+		return ToolInfo{Reason: "pinned binary missing: " + err.Error()}, nil
 	}
-	p, err = filepath.Abs(p)
+	p, err := filepath.Abs(p)
 	if err != nil {
 		return ToolInfo{Reason: err.Error()}, nil
 	}
@@ -104,6 +128,13 @@ func (b *Base) Detect(ctx context.Context) (ToolInfo, error) {
 	return info, nil
 }
 
+// UsePath records an already-verified executable without running a
+// version probe, for callers that establish integrity out-of-band
+// (plugin lock verification). Exec requires it before running.
+func (b *Base) UsePath(path, version string) {
+	b.path, b.version = path, version
+}
+
 func (b *Base) env() []string {
 	var env []string
 	for _, k := range append(append([]string{}, allowedEnv...), b.ExtraEnv...) {
@@ -128,12 +159,14 @@ func (b *Base) Exec(ctx context.Context, scratch string, args []string, timeout 
 	if b.path == "" {
 		return nil, errors.New("adapter: Detect must succeed before Exec")
 	}
-	for _, a := range args {
+	argv := append(append([]string{}, b.Wrapper...), b.path)
+	argv = append(argv, args...)
+	for _, a := range argv {
 		if strings.ContainsRune(a, 0) {
 			return nil, errors.New("adapter: NUL byte in argument")
 		}
 	}
-	if err := CheckForbidden(args); err != nil {
+	if err := CheckForbidden(argv); err != nil {
 		return nil, err
 	}
 	if timeout <= 0 {
@@ -148,9 +181,13 @@ func (b *Base) Exec(ctx context.Context, scratch string, args []string, timeout 
 	}
 	defer outFile.Close()
 
-	cmd := exec.CommandContext(cctx, b.path, args...)
+	cmd := exec.CommandContext(cctx, argv[0], argv[1:]...)
+	setNewProcessGroup(cmd, b.Setpgid)
 	cmd.Env = b.env()
 	cmd.Dir = scratch
+	if b.Stdin != nil {
+		cmd.Stdin = b.Stdin
+	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -162,11 +199,38 @@ func (b *Base) Exec(ctx context.Context, scratch string, args []string, timeout 
 		return nil, err
 	}
 	capped := &cappedWriter{w: bufio.NewWriter(outFile), max: MaxStdoutBytes}
-	_, copyErr := io.Copy(capped, stdout)
+	copyDone := make(chan error, 1)
+	go func() {
+		_, err := io.Copy(capped, stdout)
+		copyDone <- err
+	}()
+	var copyErr error
+	if b.Setpgid {
+		// Killing the whole group closes every copy of the stdout
+		// pipe (a forked grandchild inherits the write end and would
+		// otherwise hold the copy open past the timeout), so the copy
+		// always finishes after the kill.
+		select {
+		case copyErr = <-copyDone:
+		case <-cctx.Done():
+			b.kill(cmd)
+			copyErr = <-copyDone
+		}
+	} else {
+		copyErr = <-copyDone
+	}
 	if errors.Is(copyErr, errCapExceeded) {
-		_ = cmd.Process.Kill()
+		b.kill(cmd)
 	}
 	waitErr := cmd.Wait()
+	if c, ok := b.Stdin.(io.Closer); ok {
+		_ = c.Close()
+	}
+	// On timeout the context already killed the child; with Setpgid the
+	// group kill reaps forked grandchildren too.
+	if cctx.Err() != nil {
+		b.kill(cmd)
+	}
 	_ = capped.w.Flush()
 	res := &Result{StdoutPath: outPath, StderrTail: tail.String(), Duration: time.Since(start)}
 	if errors.Is(copyErr, errCapExceeded) {
@@ -184,6 +248,19 @@ func (b *Base) Exec(ctx context.Context, scratch string, args []string, timeout 
 		return res, waitErr
 	}
 	return res, nil
+}
+
+// kill terminates the child, or the whole process group when Setpgid is
+// set. Best effort: errors mean the process is already gone.
+func (b *Base) kill(cmd *exec.Cmd) {
+	if cmd == nil || cmd.Process == nil {
+		return
+	}
+	if b.Setpgid {
+		killProcessGroup(cmd.Process.Pid)
+		return
+	}
+	_ = cmd.Process.Kill()
 }
 
 var errCapExceeded = errors.New("output cap exceeded")

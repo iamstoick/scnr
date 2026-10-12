@@ -35,6 +35,10 @@ const (
 	ActionSchedule        = "schedule"
 	ActionScheduleSkipped = "schedule_skipped"
 	ActionIntrusive       = "intrusive"
+	ActionPluginInstall   = "plugin_install"
+	ActionPluginRemove    = "plugin_remove"
+	ActionPluginVerify    = "plugin_verify"
+	ActionPluginIntegrity = "plugin_integrity"
 )
 
 // Writer appends audit entries.
