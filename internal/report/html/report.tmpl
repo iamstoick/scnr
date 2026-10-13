@@ -3,120 +3,1163 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>scnr report {{.Scan.ID | short}}</title>
-<style>{{.CSS}}</style>
+<title>scnr · {{.Scan.ID | short}} · {{.Scan.StartedAt.Format "2006-01-02"}}</title>
+<style>
+/* ── Reset & tokens ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:          #0f1117;
+  --bg2:         #161b22;
+  --bg3:         #1c2230;
+  --border:      #30363d;
+  --border-soft: #21262d;
+  --fg:          #e6edf3;
+  --fg2:         #8b949e;
+  --fg3:         #6e7681;
+  --accent:      #58a6ff;
+
+  --c-critical:  #ff4444;
+  --c-high:      #f97316;
+  --c-medium:    #eab308;
+  --c-low:       #3b82f6;
+  --c-info:      #6b7280;
+  --c-ok:        #3fb950;
+
+  --grade-a:     #3fb950;
+  --grade-b:     #58a6ff;
+  --grade-c:     #eab308;
+  --grade-d:     #f97316;
+  --grade-f:     #ff4444;
+
+  --radius:      8px;
+  --radius-sm:   5px;
+  --shadow:      0 1px 3px rgba(0,0,0,.4);
+  --font:        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono:        ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--fg);
+  background: var(--bg);
+  min-height: 100vh;
+}
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+.layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+}
+
+/* ── Top nav bar ─────────────────────────────────────────────────────────── */
+.topbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: .75rem 1.5rem;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.topbar-logo {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  text-decoration: none;
+  color: var(--fg);
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: -.02em;
+}
+
+.topbar-logo svg { color: var(--accent); flex-shrink: 0; }
+
+.topbar-divider { width: 1px; height: 1.4rem; background: var(--border); }
+
+.topbar-scan {
+  font-size: .8rem;
+  color: var(--fg2);
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+
+.topbar-badge {
+  padding: .15rem .5rem;
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 600;
+  border: 1px solid currentColor;
+}
+
+.topbar-spacer { flex: 1; }
+
+.topbar-grade {
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.grade-A { color: var(--grade-a); }
+.grade-B { color: var(--grade-b); }
+.grade-C { color: var(--grade-c); }
+.grade-D { color: var(--grade-d); }
+.grade-F { color: var(--grade-f); }
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+.sidebar {
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  padding: 1.25rem 0;
+  position: sticky;
+  top: 47px;
+  height: calc(100vh - 47px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.sidebar nav { display: flex; flex-direction: column; }
+
+.nav-section-label {
+  padding: .35rem 1.25rem;
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--fg3);
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .45rem 1.25rem;
+  color: var(--fg2);
+  text-decoration: none;
+  font-size: .85rem;
+  transition: color .15s, background .15s;
+  border-left: 2px solid transparent;
+}
+
+.nav-link:hover { color: var(--fg); background: var(--bg3); }
+.nav-link.active { color: var(--accent); border-left-color: var(--accent); background: rgba(88,166,255,.08); }
+.nav-link svg { flex-shrink: 0; opacity: .7; }
+
+.nav-count {
+  margin-left: auto;
+  font-size: .7rem;
+  padding: .1rem .4rem;
+  border-radius: 999px;
+  background: var(--bg3);
+  color: var(--fg2);
+}
+
+.nav-sep { height: 1px; background: var(--border-soft); margin: .5rem 1.25rem; }
+
+/* ── Main content ────────────────────────────────────────────────────────── */
+.main {
+  padding: 1.75rem 2rem 4rem;
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+.section { margin-bottom: 2.5rem; scroll-margin-top: 60px; }
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  margin-bottom: 1rem;
+}
+
+.section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.section-count {
+  font-size: .75rem;
+  padding: .15rem .5rem;
+  border-radius: 999px;
+  background: var(--bg3);
+  color: var(--fg2);
+  border: 1px solid var(--border);
+}
+
+/* ── Posture scorecard ───────────────────────────────────────────────────── */
+.scorecard-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 700px) {
+  .scorecard-grid { grid-template-columns: 1fr; }
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+}
+
+.score-ring-wrap {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  flex-shrink: 0;
+}
+
+.score-ring-wrap svg { transform: rotate(-90deg); }
+
+.score-ring-bg { fill: none; stroke: var(--bg3); stroke-width: 10; }
+
+.score-ring-fill {
+  fill: none;
+  stroke-width: 10;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s cubic-bezier(.4,0,.2,1);
+}
+
+.score-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.score-num {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -.03em;
+}
+
+.score-of { font-size: .7rem; color: var(--fg2); }
+
+.scorecard-right { min-width: 0; }
+
+.grade-display {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1;
+  margin-bottom: .25rem;
+}
+
+.grade-label { font-size: .8rem; color: var(--fg2); margin-bottom: 1rem; }
+.grade-partial { font-size: .65em; color: var(--c-medium); font-weight: 500; }
+
+.severity-bars {
+  display: flex;
+  flex-direction: column;
+  gap: .45rem;
+}
+
+.sev-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 36px;
+  align-items: center;
+  gap: .6rem;
+  font-size: .8rem;
+}
+
+.sev-label { color: var(--fg2); text-align: right; }
+.sev-bar-track { height: 6px; border-radius: 3px; background: var(--bg3); overflow: hidden; }
+.sev-bar-fill { height: 100%; border-radius: 3px; transition: width 1s cubic-bezier(.4,0,.2,1); }
+.sev-critical .sev-bar-fill { background: var(--c-critical); }
+.sev-high     .sev-bar-fill { background: var(--c-high); }
+.sev-medium   .sev-bar-fill { background: var(--c-medium); }
+.sev-low      .sev-bar-fill { background: var(--c-low); }
+.sev-info     .sev-bar-fill { background: var(--c-info); }
+.sev-val { text-align: right; font-weight: 700; font-size: .8rem; }
+.sev-critical .sev-val { color: var(--c-critical); }
+.sev-high     .sev-val { color: var(--c-high); }
+.sev-medium   .sev-val { color: var(--c-medium); }
+.sev-low      .sev-val { color: var(--c-low); }
+.sev-info     .sev-val { color: var(--c-info); }
+
+/* ── Alert banners ───────────────────────────────────────────────────────── */
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  padding: .7rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: .83rem;
+  margin-top: .75rem;
+  border: 1px solid;
+}
+.alert svg { flex-shrink: 0; margin-top: 1px; }
+.alert-critical { background: rgba(255,68,68,.1); border-color: rgba(255,68,68,.3); color: #fca5a5; }
+.alert-warn { background: rgba(234,179,8,.08); border-color: rgba(234,179,8,.25); color: #fde68a; }
+.alert-info { background: rgba(88,166,255,.08); border-color: rgba(88,166,255,.2); color: #93c5fd; }
+
+/* ── Stat tiles ──────────────────────────────────────────────────────────── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: .75rem;
+}
+
+.stat-tile {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-tile::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.stat-critical::before { background: var(--c-critical); }
+.stat-high::before     { background: var(--c-high); }
+.stat-medium::before   { background: var(--c-medium); }
+.stat-low::before      { background: var(--c-low); }
+.stat-info::before     { background: var(--c-info); }
+.stat-ok::before       { background: var(--c-ok); }
+
+.stat-val {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -.03em;
+}
+
+.stat-critical .stat-val { color: var(--c-critical); }
+.stat-high     .stat-val { color: var(--c-high); }
+.stat-medium   .stat-val { color: var(--c-medium); }
+.stat-low      .stat-val { color: var(--c-low); }
+.stat-info     .stat-val { color: var(--c-info); }
+.stat-ok       .stat-val { color: var(--c-ok); }
+
+.stat-label {
+  font-size: .72rem;
+  color: var(--fg2);
+  margin-top: .1rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-weight: 600;
+}
+
+/* ── Card ────────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* ── Top fixes ───────────────────────────────────────────────────────────── */
+.fix-list { display: flex; flex-direction: column; gap: 0; }
+
+.fix-item {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  border-bottom: 1px solid var(--border-soft);
+  text-decoration: none;
+  color: inherit;
+  transition: background .12s;
+}
+
+.fix-item:last-child { border-bottom: none; }
+.fix-item:hover { background: var(--bg3); }
+
+.fix-rank {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: .9rem 0 .9rem;
+  font-size: .7rem;
+  font-weight: 700;
+  color: var(--fg3);
+  border-right: 1px solid var(--border-soft);
+}
+
+.fix-body { padding: .8rem 1rem; min-width: 0; }
+
+.fix-head {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+  margin-bottom: .25rem;
+}
+
+.fix-title { font-size: .9rem; font-weight: 600; }
+.fix-asset { font-size: .75rem; color: var(--fg2); margin-left: auto; }
+.fix-desc { font-size: .8rem; color: var(--fg2); line-height: 1.5; }
+
+/* ── Risk badge ──────────────────────────────────────────────────────────── */
+.risk-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 20px;
+  padding: 0 .35rem;
+  border-radius: 4px;
+  font-size: .72rem;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.risk-critical { background: var(--c-critical); }
+.risk-high     { background: var(--c-high); }
+.risk-medium   { background: var(--c-medium); color: #1a1a1a; }
+.risk-low      { background: var(--c-low); }
+.risk-info     { background: var(--c-info); }
+
+/* ── Findings ────────────────────────────────────────────────────────────── */
+.asset-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: .75rem;
+  overflow: hidden;
+}
+
+.asset-summary {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .75rem 1rem;
+  background: var(--bg2);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  font-size: .87rem;
+  gap: .6rem;
+}
+
+.asset-summary::-webkit-details-marker { display: none; }
+.asset-summary::marker { display: none; }
+
+.asset-summary:hover { background: var(--bg3); }
+
+.asset-chevron {
+  flex-shrink: 0;
+  transition: transform .2s;
+  color: var(--fg3);
+}
+
+details[open] .asset-chevron { transform: rotate(90deg); }
+
+.asset-key {
+  font-family: var(--mono);
+  font-size: .8rem;
+  color: var(--accent);
+  word-break: break-all;
+}
+
+.asset-meta { margin-left: auto; font-size: .75rem; color: var(--fg2); white-space: nowrap; }
+.asset-max-risk { font-weight: 700; }
+
+.finding-card {
+  border-top: 1px solid var(--border-soft);
+  padding: .9rem 1rem;
+  background: var(--bg);
+  position: relative;
+  border-left: 3px solid transparent;
+}
+
+.finding-critical { border-left-color: var(--c-critical); }
+.finding-high     { border-left-color: var(--c-high); }
+.finding-medium   { border-left-color: var(--c-medium); }
+.finding-low      { border-left-color: var(--c-low); }
+.finding-info     { border-left-color: var(--c-info); }
+
+.finding-head {
+  display: flex;
+  align-items: flex-start;
+  gap: .6rem;
+  margin-bottom: .5rem;
+}
+
+.finding-title {
+  font-size: .88rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.finding-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  margin-bottom: .6rem;
+}
+
+.pill {
+  font-size: .7rem;
+  padding: .1rem .45rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--fg2);
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+.pill-kev {
+  background: rgba(255,68,68,.15);
+  border-color: rgba(255,68,68,.4);
+  color: #fca5a5;
+  font-weight: 700;
+}
+
+.pill-engine { border-color: rgba(88,166,255,.3); color: #93c5fd; }
+.pill-cve    { border-color: rgba(234,179,8,.3);  color: #fde68a; }
+.pill-cvss   { border-color: rgba(249,115,22,.3); color: #fed7aa; }
+
+.finding-dl {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr;
+  gap: .2rem .75rem;
+  font-size: .8rem;
+}
+
+.finding-dl dt { color: var(--fg2); padding-top: .05rem; }
+.finding-dl dd { color: var(--fg); word-break: break-word; }
+
+.finding-evidence {
+  margin-top: .6rem;
+  background: var(--bg2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.evidence-header {
+  padding: .3rem .7rem;
+  font-size: .7rem;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--fg3);
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.evidence-pre {
+  padding: .5rem .75rem;
+  font-family: var(--mono);
+  font-size: .78rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--fg2);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ── Coverage table ──────────────────────────────────────────────────────── */
+.coverage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .83rem;
+}
+
+.coverage-table th {
+  text-align: left;
+  padding: .55rem .75rem;
+  color: var(--fg2);
+  font-weight: 600;
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+
+.coverage-table td {
+  padding: .55rem .75rem;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: top;
+}
+
+.coverage-table tr:last-child td { border-bottom: none; }
+.coverage-table tr:hover td { background: var(--bg3); }
+
+.status-ok      { color: var(--c-ok); }
+.status-skip    { color: var(--fg3); }
+.status-fail    { color: var(--c-high); }
+.status-partial { color: var(--c-medium); }
+
+.status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: .4rem;
+  vertical-align: middle;
+}
+
+.dot-ok      { background: var(--c-ok); }
+.dot-skip    { background: var(--fg3); }
+.dot-fail    { background: var(--c-high); }
+.dot-partial { background: var(--c-medium); }
+
+/* ── Metadata table ──────────────────────────────────────────────────────── */
+.meta-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+.meta-table th {
+  width: 160px;
+  text-align: left;
+  padding: .5rem .75rem;
+  color: var(--fg2);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: top;
+}
+.meta-table td {
+  padding: .5rem .75rem;
+  border-bottom: 1px solid var(--border-soft);
+  font-family: var(--mono);
+  font-size: .78rem;
+  word-break: break-all;
+}
+.meta-table tr:last-child th,
+.meta-table tr:last-child td { border-bottom: none; }
+
+/* ── Suppressed findings ─────────────────────────────────────────────────── */
+.supp-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.supp-table th {
+  text-align: left;
+  padding: .5rem .75rem;
+  color: var(--fg2);
+  font-weight: 600;
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+.supp-table td {
+  padding: .5rem .75rem;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: top;
+}
+.supp-table tr:last-child td { border-bottom: none; }
+.supp-table tr:hover td { background: var(--bg3); }
+
+/* ── Score explanation ───────────────────────────────────────────────────── */
+.explain-block {
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: .75rem 1rem;
+  font-family: var(--mono);
+  font-size: .78rem;
+  color: var(--fg2);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.footer {
+  padding: 1.5rem 2rem;
+  font-size: .75rem;
+  color: var(--fg3);
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.footer-logo { font-weight: 700; color: var(--fg2); }
+
+/* ── Misc helpers ────────────────────────────────────────────────────────── */
+.mono { font-family: var(--mono); font-size: .85em; }
+.text-muted { color: var(--fg2); }
+.text-sm { font-size: .8rem; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font-family: var(--mono); font-size: .85em; background: var(--bg3); padding: .1em .3em; border-radius: 3px; }
+.empty-state {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: var(--fg3);
+  font-size: .85rem;
+}
+.empty-state svg { display: block; margin: 0 auto .75rem; opacity: .4; }
+
+/* scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--fg3); }
+</style>
 </head>
 <body>
-<header>
-  <h1>scnr security report</h1>
-  <p class="muted">Scan <code>{{.Scan.ID}}</code> &middot; profile {{.Scan.Profile}} &middot; {{.Scan.StartedAt.Format "2006-01-02 15:04 UTC"}} &middot; targets: {{.TargetSummary}}</p>
-</header>
 
-<section class="scorecard grade-{{.Grade}}">
-  <div class="score">
-    <div class="num">{{.Score}}<span class="of">/100</span></div>
-    <div class="grade">Grade {{.Grade}}{{if .Partial}} <span class="partial">(partial)</span>{{end}}</div>
-    {{if .DeltaText}}<div class="delta">{{.DeltaText}}</div>{{end}}
-  </div>
-  <ul class="counts">
-    <li class="b-critical"><b>{{index .Counts "critical"}}</b> critical</li>
-    <li class="b-high"><b>{{index .Counts "high"}}</b> high</li>
-    <li class="b-medium"><b>{{index .Counts "medium"}}</b> medium</li>
-    <li class="b-low"><b>{{index .Counts "low"}}</b> low</li>
-    <li class="b-info"><b>{{index .Counts "info"}}</b> info</li>
-  </ul>
-  {{if .KEVOpen}}<p class="warn">An open finding is on CISA's Known Exploited Vulnerabilities list; the grade is capped at D until it is fixed.</p>{{end}}
-  {{if .Partial}}<p class="warn">Some engines did not run or failed; see Coverage below. The score only reflects what ran.</p>{{end}}
-  {{if .Scan.Intrusive.Ran}}<p class="warn">Active checks ran: {{.Scan.Intrusive.Probes}} probe requests against {{len .Scan.Intrusive.Targets}} target(s).</p>{{end}}
-  {{if not .ExploitData}}<p class="muted">Exploit data unavailable (KEV/EPSS not loaded); run <code>scnr db update</code> for exploit-aware scoring.</p>{{end}}
-</section>
+{{/* ── Pre-compute total findings count ────────────────────────────────── */}}
+{{$totalFindings := .Total}}
+{{$critCount := index .Counts "critical"}}
+{{$highCount  := index .Counts "high"}}
+{{$medCount   := index .Counts "medium"}}
+{{$lowCount   := index .Counts "low"}}
+{{$infoCount  := index .Counts "info"}}
 
-<section>
-  <h2>Fix these first</h2>
-  {{if .TopFixes}}
-  <ol class="fixes">
-    {{range .TopFixes}}
-    <li class="b-{{bucket .Risk}}">
-      <div class="fix-head"><span class="risk">{{.Risk}}</span> <strong>{{.Title}}</strong> <span class="muted">{{.AssetKey}}{{if .Location}} &middot; {{.Location}}{{end}}</span></div>
-      <div class="fix-body">{{.HowToFix}}</div>
-    </li>
-    {{end}}
-  </ol>
-  {{else}}<p>No open findings with a fix. Nice.</p>{{end}}
-</section>
+{{/* ── Max count for bar scaling ────────────────────────────────────────── */}}
+{{$maxCount := $critCount}}
+{{if gt $highCount $maxCount}}{{$maxCount = $highCount}}{{end}}
+{{if gt $medCount  $maxCount}}{{$maxCount = $medCount}}{{end}}
+{{if gt $lowCount  $maxCount}}{{$maxCount = $lowCount}}{{end}}
+{{if gt $infoCount $maxCount}}{{$maxCount = $infoCount}}{{end}}
+{{if lt $maxCount 1}}{{$maxCount = 1}}{{end}}
 
-<section>
-  <h2>Findings ({{.Total}}){{if .Truncated}} <span class="muted">showing the top {{len .Assets}} assets' highest-risk findings; see report.json for all</span>{{end}}</h2>
-  {{range .Assets}}
-  <details open class="asset">
-    <summary><strong>{{.Key}}</strong> <span class="muted">{{len .Findings}} finding(s), max risk {{.MaxRisk}}</span></summary>
-    {{range .Findings}}
-    <article class="finding b-{{bucket .Risk}}">
-      <h3><span class="risk">{{.Risk}}</span> {{.Title}}</h3>
-      <p class="meta">
-        <span>rule <code>{{.RuleID}}</code></span>
-        <span>engine {{.Engine}}</span>
-        <span>severity {{sevName .Severity}}</span>
-        <span>confidence {{confName .Confidence}}</span>
-        {{if .CWE}}<span>{{.CWE}}</span>{{end}}
-        {{if .CVSS}}<span>CVSS {{printf "%.1f" .CVSS.Score}}</span>{{end}}
-        {{if .EPSS}}<span>EPSS {{printf "%.3f" .EPSS}}</span>{{end}}
-        {{if .KEV}}<span class="kev">KEV</span>{{end}}
-        {{if .Location}}<span>at <code>{{.Location}}</code></span>{{end}}
-      </p>
-      <dl>
-        <dt>What it is</dt><dd>{{.WhatItIs}}</dd>
-        <dt>Why it matters</dt><dd>{{.WhyItMatters}}</dd>
-        <dt>How to fix</dt><dd>{{.HowToFix}}</dd>
-        {{if eq (confName .Confidence) "tentative"}}<dt>Note</dt><dd>Pattern match; verify in context before acting.</dd>{{end}}
-      </dl>
-      {{if .Evidence}}
-      <div class="evidence">
-        <div class="muted">Evidence (redacted)</div>
-        {{range .Evidence}}<pre>[{{.Kind}}] {{.Location}}
-{{.Redacted}}</pre>{{end}}
+<div class="layout">
+
+  {{/* ══ Top navigation bar ══════════════════════════════════════════════ */}}
+  <header class="topbar">
+    <a class="topbar-logo" href="#overview">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      scnr
+    </a>
+    <div class="topbar-divider"></div>
+    <div class="topbar-scan">
+      <code class="mono">{{.Scan.ID | short}}</code>
+      <span>·</span>
+      <span>{{.Scan.Profile}}</span>
+      <span>·</span>
+      <span>{{.Scan.StartedAt.Format "2006-01-02 15:04 UTC"}}</span>
+      <span>·</span>
+      <span>{{.TargetSummary}}</span>
+      {{if .Scan.Partial}}
+      <span class="topbar-badge" style="color:var(--c-medium);border-color:var(--c-medium)">PARTIAL</span>
+      {{end}}
+      {{if .KEVOpen}}
+      <span class="topbar-badge" style="color:var(--c-critical);border-color:var(--c-critical)">KEV OPEN</span>
+      {{end}}
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-grade grade-{{.Grade}}">{{.Grade}}</div>
+    <div style="font-size:.8rem;color:var(--fg2);">{{.Score}}/100</div>
+  </header>
+
+  {{/* ══ Sidebar navigation ══════════════════════════════════════════════ */}}
+  <aside class="sidebar">
+    <nav>
+      <span class="nav-section-label">Scan</span>
+      <a class="nav-link active" href="#overview">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Overview
+      </a>
+      <a class="nav-link" href="#top-fixes">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Top Fixes
+        {{if .TopFixes}}<span class="nav-count">{{len .TopFixes}}</span>{{end}}
+      </a>
+      <div class="nav-sep"></div>
+      <span class="nav-section-label">Findings</span>
+      <a class="nav-link" href="#findings">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        All Findings
+        {{if $totalFindings}}<span class="nav-count">{{$totalFindings}}</span>{{end}}
+      </a>
+      {{if .Suppressed}}
+      <a class="nav-link" href="#suppressed">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+        Accepted / Suppressed
+        <span class="nav-count">{{len .Suppressed}}</span>
+      </a>
+      {{end}}
+      <div class="nav-sep"></div>
+      <span class="nav-section-label">Infrastructure</span>
+      <a class="nav-link" href="#coverage">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Coverage
+        <span class="nav-count">{{len .Scan.Engines}}</span>
+      </a>
+      <a class="nav-link" href="#metadata">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+        Scan Metadata
+      </a>
+    </nav>
+  </aside>
+
+  {{/* ══ Main content ════════════════════════════════════════════════════ */}}
+  <main class="main">
+
+    {{/* ── Overview ─────────────────────────────────────────────────────── */}}
+    <section class="section" id="overview">
+      <div class="section-header">
+        <h2 class="section-title">Security Posture</h2>
+      </div>
+
+      <div class="scorecard-grid">
+        {{/* Donut ring */}}
+        <div class="score-ring-wrap">
+          <svg width="140" height="140" viewBox="0 0 140 140">
+            <circle class="score-ring-bg" cx="70" cy="70" r="55"/>
+            <circle class="score-ring-fill grade-{{.Grade}}"
+              cx="70" cy="70" r="55"
+              style="stroke:currentColor;stroke-dasharray:{{mul .Score 345 | div100}} 345;stroke-dashoffset:0"
+            />
+          </svg>
+          <div class="score-center">
+            <div class="score-num grade-{{.Grade}}">{{.Score}}<span class="score-of">/100</span></div>
+          </div>
+        </div>
+
+        {{/* Right side: grade + bars */}}
+        <div class="scorecard-right">
+          <div class="grade-display grade-{{.Grade}}">Grade {{.Grade}}{{if .Partial}} <span class="grade-partial">(partial)</span>{{end}}</div>
+          <div class="grade-label">
+            {{if eq .Grade "A"}}Excellent — minimal exposure{{end}}
+            {{if eq .Grade "B"}}Good — low residual risk{{end}}
+            {{if eq .Grade "C"}}Fair — remediation recommended{{end}}
+            {{if eq .Grade "D"}}Poor — urgent action needed{{end}}
+            {{if eq .Grade "F"}}Critical — immediate response required{{end}}
+            {{if .DeltaText}}&nbsp;&middot;&nbsp;{{.DeltaText}}{{end}}
+          </div>
+
+          <div class="severity-bars">
+            <div class="sev-row sev-critical">
+              <span class="sev-label">Critical</span>
+              <div class="sev-bar-track">
+                <div class="sev-bar-fill" style="width:{{if gt $maxCount 0}}{{mul $critCount 100 | divInt $maxCount}}%{{else}}0%{{end}}"></div>
+              </div>
+              <span class="sev-val">{{$critCount}}</span>
+            </div>
+            <div class="sev-row sev-high">
+              <span class="sev-label">High</span>
+              <div class="sev-bar-track">
+                <div class="sev-bar-fill" style="width:{{if gt $maxCount 0}}{{mul $highCount 100 | divInt $maxCount}}%{{else}}0%{{end}}"></div>
+              </div>
+              <span class="sev-val">{{$highCount}}</span>
+            </div>
+            <div class="sev-row sev-medium">
+              <span class="sev-label">Medium</span>
+              <div class="sev-bar-track">
+                <div class="sev-bar-fill" style="width:{{if gt $maxCount 0}}{{mul $medCount 100 | divInt $maxCount}}%{{else}}0%{{end}}"></div>
+              </div>
+              <span class="sev-val">{{$medCount}}</span>
+            </div>
+            <div class="sev-row sev-low">
+              <span class="sev-label">Low</span>
+              <div class="sev-bar-track">
+                <div class="sev-bar-fill" style="width:{{if gt $maxCount 0}}{{mul $lowCount 100 | divInt $maxCount}}%{{else}}0%{{end}}"></div>
+              </div>
+              <span class="sev-val">{{$lowCount}}</span>
+            </div>
+            <div class="sev-row sev-info">
+              <span class="sev-label">Info</span>
+              <div class="sev-bar-track">
+                <div class="sev-bar-fill" style="width:{{if gt $maxCount 0}}{{mul $infoCount 100 | divInt $maxCount}}%{{else}}0%{{end}}"></div>
+              </div>
+              <span class="sev-val">{{$infoCount}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {{/* Alert banners */}}
+      {{if .KEVOpen}}
+      <div class="alert alert-critical">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>An open finding is on CISA's Known Exploited Vulnerabilities list. The grade is capped at D until it is resolved.</span>
       </div>
       {{end}}
-      {{if .CVEs}}<p class="muted">CVEs: {{join .CVEs ", "}}</p>{{end}}
-      {{if .References}}<p class="muted">References: {{range .References}}<a href="{{.}}" rel="noopener noreferrer">{{.}}</a> {{end}}</p>{{end}}
-    </article>
+      {{if .Scan.Partial}}
+      <div class="alert alert-warn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>Some engines did not run or failed; see Coverage below. The score only reflects checked engines.</span>
+      </div>
+      {{end}}
+      {{if .Scan.Intrusive.Ran}}
+      <div class="alert alert-info">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span>Active checks ran: {{.Scan.Intrusive.Probes}} probe requests against {{len .Scan.Intrusive.Targets}} target(s).</span>
+      </div>
+      {{end}}
+      {{if not .ExploitData}}
+      <div class="alert alert-info">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span>Exploit data unavailable (KEV/EPSS not loaded). Run <code>scnr db update</code> for exploit-aware scoring.</span>
+      </div>
+      {{end}}
+
+      {{/* Stat tiles */}}
+      <div class="stat-grid" style="margin-top:1.25rem">
+        <div class="stat-tile stat-critical">
+          <div class="stat-val">{{$critCount}}</div>
+          <div class="stat-label">Critical</div>
+        </div>
+        <div class="stat-tile stat-high">
+          <div class="stat-val">{{$highCount}}</div>
+          <div class="stat-label">High</div>
+        </div>
+        <div class="stat-tile stat-medium">
+          <div class="stat-val">{{$medCount}}</div>
+          <div class="stat-label">Medium</div>
+        </div>
+        <div class="stat-tile stat-low">
+          <div class="stat-val">{{$lowCount}}</div>
+          <div class="stat-label">Low</div>
+        </div>
+        <div class="stat-tile stat-info">
+          <div class="stat-val">{{$infoCount}}</div>
+          <div class="stat-label">Info</div>
+        </div>
+        <div class="stat-tile stat-ok">
+          <div class="stat-val">{{$totalFindings}}</div>
+          <div class="stat-label">Total Findings</div>
+        </div>
+      </div>
+    </section>
+
+    {{/* ── Top Fixes ─────────────────────────────────────────────────────── */}}
+    <section class="section" id="top-fixes">
+      <div class="section-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-high)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <h2 class="section-title">Fix These First</h2>
+        {{if .TopFixes}}<span class="section-count">{{len .TopFixes}}</span>{{end}}
+      </div>
+
+      <div class="card">
+        {{if .TopFixes}}
+        <div class="fix-list">
+          {{range $i, $f := .TopFixes}}
+          <div class="fix-item">
+            <div class="fix-rank">{{inc $i}}</div>
+            <div class="fix-body">
+              <div class="fix-head">
+                <span class="risk-badge risk-{{bucket $f.Risk}}">{{$f.Risk}}</span>
+                <span class="fix-title">{{$f.Title}}</span>
+                <span class="fix-asset">{{$f.AssetKey}}{{if $f.Location}} · <code>{{$f.Location}}</code>{{end}}</span>
+              </div>
+              <div class="fix-desc">{{$f.HowToFix}}</div>
+            </div>
+          </div>
+          {{end}}
+        </div>
+        {{else}}
+        <div class="empty-state">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          No open findings with a fix. Nice work.
+        </div>
+        {{end}}
+      </div>
+    </section>
+
+    {{/* ── All Findings ──────────────────────────────────────────────────── */}}
+    <section class="section" id="findings">
+      <div class="section-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <h2 class="section-title">Findings</h2>
+        <span class="section-count">{{$totalFindings}}</span>
+        {{if .Truncated}}<span class="text-sm text-muted">&nbsp;·&nbsp; showing top {{len .Assets}} assets — see report.json for all</span>{{end}}
+      </div>
+
+      {{if .Assets}}
+      {{range .Assets}}
+      <details class="asset-group" open>
+        <summary class="asset-summary">
+          <svg class="asset-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          <span class="asset-key">{{.Key}}</span>
+          <span class="asset-meta">
+            <span>{{len .Findings}} finding(s)</span>
+            &nbsp;·&nbsp;
+            max risk <span class="asset-max-risk" style="color:{{if ge .MaxRisk 75}}var(--c-critical){{else if ge .MaxRisk 50}}var(--c-high){{else if ge .MaxRisk 25}}var(--c-medium){{else if ge .MaxRisk 10}}var(--c-low){{else}}var(--c-info){{end}}">{{.MaxRisk}}</span>
+          </span>
+        </summary>
+
+        {{range .Findings}}
+        {{$bkt := bucket .Risk}}
+        <div class="finding-card finding-{{$bkt}}">
+          <div class="finding-head">
+            <span class="risk-badge risk-{{$bkt}}">{{.Risk}}</span>
+            <span class="finding-title">{{.Title}}</span>
+          </div>
+
+          <div class="finding-pills">
+            <span class="pill">{{sevName .Severity}}</span>
+            <span class="pill">{{confName .Confidence}}</span>
+            <span class="pill pill-engine">{{.Engine}}</span>
+            <span class="pill mono">{{.RuleID}}</span>
+            {{if .CWE}}<span class="pill">{{.CWE}}</span>{{end}}
+            {{if .CVSS}}<span class="pill pill-cvss">CVSS {{printf "%.1f" .CVSS.Score}}</span>{{end}}
+            {{if .EPSS}}<span class="pill">EPSS {{printf "%.3f" .EPSS}}</span>{{end}}
+            {{if .KEV}}<span class="pill pill-kev">KEV</span>{{end}}
+            {{range .CVEs}}<span class="pill pill-cve">{{.}}</span>{{end}}
+          </div>
+
+          {{if .Location}}<div style="font-size:.78rem;color:var(--fg2);margin-bottom:.5rem;">at <code>{{.Location}}</code></div>{{end}}
+
+          <dl class="finding-dl">
+            <dt>What it is</dt><dd>{{.WhatItIs}}</dd>
+            <dt>Why it matters</dt><dd>{{.WhyItMatters}}</dd>
+            <dt>How to fix</dt><dd>{{.HowToFix}}</dd>
+            {{if eq (confName .Confidence) "tentative"}}<dt>Note</dt><dd>Pattern match — verify in context before acting.</dd>{{end}}
+          </dl>
+
+          {{if .Evidence}}
+          <div class="finding-evidence">
+            <div class="evidence-header">Evidence (redacted)</div>
+            {{range .Evidence}}
+            <pre class="evidence-pre">[{{.Kind}}] {{.Location}}
+{{.Redacted}}</pre>
+            {{end}}
+          </div>
+          {{end}}
+
+          {{if .References}}
+          <div style="margin-top:.5rem;font-size:.75rem;color:var(--fg2);">
+            References:
+            {{range .References}}<a href="{{.}}" rel="noopener noreferrer" target="_blank">{{.}}</a> {{end}}
+          </div>
+          {{end}}
+        </div>
+        {{end}}
+
+      </details>
+      {{end}}
+      {{else}}
+      <div class="card">
+        <div class="empty-state">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          No open findings.
+        </div>
+      </div>
+      {{end}}
+    </section>
+
+    {{/* ── Accepted / Suppressed ─────────────────────────────────────────── */}}
+    {{if .Suppressed}}
+    <section class="section" id="suppressed">
+      <div class="section-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--fg3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+        <h2 class="section-title">Accepted / Suppressed</h2>
+        <span class="section-count">{{len .Suppressed}}</span>
+      </div>
+
+      <div class="card">
+        <table class="supp-table">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Risk</th>
+              <th>Title</th>
+              <th>Asset</th>
+              <th>Location</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .Suppressed}}
+            <tr>
+              <td><span style="color:var(--fg2)">{{.Status}}</span></td>
+              <td><span class="risk-badge risk-{{bucket .Risk}}">{{.Risk}}</span></td>
+              <td>{{.Title}}</td>
+              <td><code>{{.AssetKey}}</code></td>
+              <td><code>{{.Location}}</code></td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </section>
     {{end}}
-  </details>
-  {{else}}<p>No findings.</p>{{end}}
-</section>
 
-{{if .Suppressed}}
-<section>
-  <h2>Accepted / suppressed ({{len .Suppressed}})</h2>
-  <table>
-    <tr><th>Status</th><th>Risk</th><th>Title</th><th>Asset</th><th>Location</th></tr>
-    {{range .Suppressed}}<tr><td>{{.Status}}</td><td>{{.Risk}}</td><td>{{.Title}}</td><td>{{.AssetKey}}</td><td>{{.Location}}</td></tr>{{end}}
-  </table>
-</section>
-{{end}}
+    {{/* ── Coverage ──────────────────────────────────────────────────────── */}}
+    <section class="section" id="coverage">
+      <div class="section-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <h2 class="section-title">Engine Coverage</h2>
+        <span class="section-count">{{len .Scan.Engines}} engines</span>
+      </div>
 
-<section>
-  <h2>Coverage</h2>
-  <table>
-    <tr><th>Engine</th><th>Version</th><th>Status</th><th>Duration</th><th>Error</th></tr>
-    {{range .Scan.Engines}}<tr><td>{{.Name}}</td><td>{{.Version}}</td><td>{{.Status}}</td><td>{{dur .Duration}}</td><td>{{.Error}}</td></tr>{{end}}
-  </table>
-  <p class="muted">Engines marked "skipped" did not run (tool not installed, offline, or not applicable). Installing nmap or nuclei adds adapter coverage now; trivy, grype, semgrep and prowler arrive in later phases. Run <code>scnr doctor --install-guide</code>.</p>
-</section>
+      <div class="card">
+        <table class="coverage-table">
+          <thead>
+            <tr>
+              <th>Engine</th>
+              <th>Version</th>
+              <th>Status</th>
+              <th>Duration</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .Scan.Engines}}
+            {{$dot := "dot-ok"}}{{$cls := "status-ok"}}
+            {{if eq .Status "skipped"}}{{$dot = "dot-skip"}}{{$cls = "status-skip"}}{{end}}
+            {{if hasPrefix .Status "skipped:"}}{{$dot = "dot-skip"}}{{$cls = "status-skip"}}{{end}}
+            {{if hasPrefix .Status "failed"}}{{$dot = "dot-fail"}}{{$cls = "status-fail"}}{{end}}
+            {{if hasPrefix .Status "partial"}}{{$dot = "dot-partial"}}{{$cls = "status-partial"}}{{end}}
+            <tr>
+              <td style="font-weight:600">{{.Name}}</td>
+              <td><code>{{if .Version}}{{.Version}}{{else}}—{{end}}</code></td>
+              <td class="{{$cls}}">
+                <span class="status-dot {{$dot}}"></span>{{.Status}}
+              </td>
+              <td style="color:var(--fg2)">{{dur .Duration}}</td>
+              <td style="color:var(--fg2);font-size:.78rem">{{.Error}}</td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-sm text-muted" style="margin-top:.6rem">
+        Engines marked "skipped" did not run (tool not installed, offline, or not applicable for this target type). Run <code>scnr doctor --install-guide</code> for installation help.
+      </p>
+    </section>
 
-<section>
-  <h2>Scan metadata</h2>
-  <table>
-    <tr><th>Consent method</th><td>{{.Scan.Consent.Method}} by {{.Scan.Consent.By}}</td></tr>
-    <tr><th>Scope hash</th><td><code>{{.Scan.ScopeHash}}</code></td></tr>
-    <tr><th>Target set hash</th><td><code>{{.Scan.TargetSetHash}}</code></td></tr>
-    <tr><th>Started</th><td>{{.Scan.StartedAt.Format "2006-01-02T15:04:05Z07:00"}}</td></tr>
-    <tr><th>Finished</th><td>{{.Scan.FinishedAt.Format "2006-01-02T15:04:05Z07:00"}}</td></tr>
-    <tr><th>Exit code</th><td>{{.Scan.ExitCode}}</td></tr>
-    <tr><th>Generated</th><td>{{.GeneratedAt}} by scnr {{.Version}}</td></tr>
-  </table>
-  <details><summary>How the score is computed</summary><pre>{{.Explain}}</pre></details>
-</section>
-<footer class="muted">scnr is a defensive discovery tool: it observes and reports, it never exploits. Secret evidence is shown masked (at most a few characters) with a keyed fingerprint; raw values are never stored.</footer>
+    {{/* ── Scan Metadata ─────────────────────────────────────────────────── */}}
+    <section class="section" id="metadata">
+      <div class="section-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+        <h2 class="section-title">Scan Metadata</h2>
+      </div>
+
+      <div class="card">
+        <table class="meta-table">
+          <tr><th>Scan ID</th>        <td>{{.Scan.ID}}</td></tr>
+          <tr><th>Profile</th>        <td>{{.Scan.Profile}}</td></tr>
+          <tr><th>Targets</th>        <td>{{.TargetSummary}}</td></tr>
+          <tr><th>Consent</th>        <td>{{.Scan.Consent.Method}} by {{.Scan.Consent.By}}</td></tr>
+          <tr><th>Scope hash</th>     <td>{{.Scan.ScopeHash}}</td></tr>
+          <tr><th>Target set hash</th><td>{{.Scan.TargetSetHash}}</td></tr>
+          <tr><th>Started</th>        <td>{{.Scan.StartedAt.Format "2006-01-02T15:04:05Z07:00"}}</td></tr>
+          <tr><th>Finished</th>       <td>{{.Scan.FinishedAt.Format "2006-01-02T15:04:05Z07:00"}}</td></tr>
+          <tr><th>Exit code</th>      <td>{{.Scan.ExitCode}}</td></tr>
+          <tr><th>Generated</th>      <td>{{.GeneratedAt}} by scnr {{.Version}}</td></tr>
+        </table>
+      </div>
+
+      {{/* Score explanation */}}
+      <details style="margin-top:1rem">
+        <summary style="cursor:pointer;font-size:.83rem;color:var(--fg2);user-select:none;padding:.4rem 0">How the posture score is computed</summary>
+        <div class="explain-block" style="margin-top:.5rem">{{.Explain}}</div>
+      </details>
+    </section>
+
+  </main>
+
+</div>{{/* end .layout */}}
+
+<footer class="footer">
+  <span class="footer-logo">scnr</span>
+  <span>Defensive discovery: observes and reports, never exploits.</span>
+  <span>Secret evidence is masked (keyed fingerprint); raw values are never stored.</span>
+  <span style="margin-left:auto;color:var(--fg3)">v{{.Version}} · {{.GeneratedAt}}</span>
+</footer>
+
 </body>
 </html>

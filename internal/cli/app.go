@@ -230,11 +230,11 @@ func Execute(ctx context.Context, a *App, args []string) int {
 	var ee *ExitError
 	if errors.As(err, &ee) {
 		if ee.Err != nil {
-			fmt.Fprintln(a.Stderr, "error:", a.redact(ee.Err.Error()))
+			fmt.Fprintln(a.Stderr, "error:", a.redact(userFacingMessage(ee.Err)))
 		}
 		return ee.Code
 	}
-	fmt.Fprintln(a.Stderr, "error:", a.redact(err.Error()))
+	fmt.Fprintln(a.Stderr, "error:", a.redact(userFacingMessage(err)))
 	return ExitUsage
 }
 

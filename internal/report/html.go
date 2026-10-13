@@ -82,6 +82,19 @@ func (h *HTML) load() error {
 			return s
 		},
 		"inc": func(i int) int { return i + 1 },
+		// mul multiplies two ints (used for bar/ring width calculations in the template).
+		"mul": func(a, b int) int { return a * b },
+		// div100 divides an int by 100, returning an int (used for score ring arc length).
+		"div100": func(a int) int { return a / 100 },
+		// divInt divides a by b safely, returning an int percentage.
+		"divInt": func(b, a int) int {
+			if b == 0 {
+				return 0
+			}
+			return a / b
+		},
+		// hasPrefix wraps strings.HasPrefix for use in templates.
+		"hasPrefix": strings.HasPrefix,
 	}
 	t, err := template.New("report.tmpl").Funcs(funcs).ParseFS(htmlAssets, "html/report.tmpl")
 	if err != nil {

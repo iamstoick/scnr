@@ -29,7 +29,7 @@ var ErrAmbiguous = errors.New("E_TARGET_AMBIGUOUS")
 // ErrURLCredentials is returned for URL targets carrying user:password@.
 // The message deliberately omits the input so the credential is never
 // echoed to stderr, logs or the audit trail.
-var ErrURLCredentials = errors.New("credentials in the target URL are not supported; remove the user:password@ part (authenticated scanning via a header/cookie option is planned)")
+var ErrURLCredentials = errors.New("credentials in the target URL are not supported; remove the user:password@ part and use --auth-file or --header/--cookie instead (see `scnr scan --help`)")
 
 // AmbiguousError lists what the input could have been.
 type AmbiguousError struct {
@@ -42,6 +42,29 @@ func (e *AmbiguousError) Error() string {
 }
 
 func (e *AmbiguousError) Unwrap() error { return ErrAmbiguous }
+
+// Friendly reframes the classification failure for newcomers: what scnr
+// tried and how to tell it what the target is. The code stays as a
+// footnote so support can still match it.
+func (e *AmbiguousError) Friendly() string {
+	raw := e.Raw
+	if raw == "" {
+		raw = "this target"
+	}
+	tried := strings.Join(e.Candidates, ", ")
+	if tried == "" {
+		tried = "common target types"
+	}
+	return fmt.Sprintf("Couldn't figure out what %q is.\n\n"+
+		"scnr tried: %s.\n\n"+
+		"What to do next:\n"+
+		"  1. If it's a website or host, check the spelling and that it resolves (connect to your VPN if it needs one).\n"+
+		"  2. If it's a file or folder, check the path exists.\n"+
+		"  3. Or tell scnr explicitly with --type: url|host|cidr|path|image|cloud\n"+
+		"     Example: scnr scan %q --type host --ack-authorized\n"+
+		"(code E_TARGET_AMBIGUOUS)",
+		raw, tried, e.Raw)
+}
 
 // Detector resolves names with an injectable resolver and filesystem root.
 type Detector struct {

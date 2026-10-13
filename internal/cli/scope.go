@@ -77,9 +77,9 @@ func (a *App) scopeCmd() *cobra.Command {
 			fmt.Fprintf(w, "ack:      %v (scnr.yaml); --ack-authorized would also satisfy it\n", a.Config.Authorization.Acknowledged)
 			dec, err := gate.Decide(ctx, t, "")
 			if err != nil {
-				fmt.Fprintf(w, "decision: REFUSE non-interactively — %v\n", err)
+				fmt.Fprintf(w, "decision: REFUSE non-interactively\n%s\n", a.redact(userFacingMessage(err)))
 				if t.Public && gate.Acknowledged {
-					fmt.Fprintln(w, "          an interactive scan (TTY, no --non-interactive) would ask for consent instead")
+					fmt.Fprintln(w, "Note: an interactive scan (TTY, no --non-interactive) would ask for consent instead where ownership proof isn't required.")
 				}
 				return nil
 			}

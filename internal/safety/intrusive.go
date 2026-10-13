@@ -29,7 +29,7 @@ func (g *IntrusiveGate) Decide(ctx context.Context, d *Decision, allowFlag bool)
 		return false, "pass --allow-intrusive to run active checks", nil
 	}
 	if d.Target.Type != domain.TargetURL {
-		return false, "active checks apply to URL targets only", nil
+		return false, "active checks apply to URL targets only — scan an https:// address to use them", nil
 	}
 	host := d.Target.Hostname
 	if host == "" {
@@ -37,7 +37,7 @@ func (g *IntrusiveGate) Decide(ctx context.Context, d *Decision, allowFlag bool)
 	}
 	rawURL := d.Target.Value
 	if denied, by := g.Scope.Denied(host, d.Addrs, rawURL); denied {
-		return false, "matches deny entry " + by, nil
+		return false, "matches deny entry " + by + "; remove it from scope.deny in scnr.yaml to permit active checks", nil
 	}
 	if !g.Scope.IntrusiveAllowed(host, d.Addrs, rawURL) {
 		return false, fmt.Sprintf("not in scope.intrusive_allow; add %q there to permit active checks", host), nil
@@ -46,7 +46,7 @@ func (g *IntrusiveGate) Decide(ctx context.Context, d *Decision, allowFlag bool)
 		return true, "", nil
 	}
 	if g.Verified == nil {
-		return false, "cannot confirm ownership verification for a public target", nil
+		return false, "cannot confirm ownership verification for a public target; run `scnr verify " + host + " --check` first", nil
 	}
 	ok, err = g.Verified(ctx, host)
 	if err != nil {

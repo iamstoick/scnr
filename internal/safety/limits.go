@@ -63,7 +63,7 @@ func NewLimits(public bool, req LimitRequest) (l *Limits, raised bool, err error
 			raised = true
 		}
 		if want > 2*def && !req.AllowRaise {
-			return 0, &RefusalError{Code: "E_LIMIT_TOO_HIGH", Target: name,
+			return 0, &RefusalError{Code: CodeLimitTooHigh, Target: name,
 				Reason: fmt.Sprintf("%d exceeds 2x default (%d); pass --i-understand-rate-limits to override", want, def)}
 		}
 		return want, nil

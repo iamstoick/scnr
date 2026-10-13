@@ -26,6 +26,7 @@ const (
 	CodeUnresolvable      = "E_UNRESOLVABLE"
 	CodeBundleUntrusted   = "E_BUNDLE_UNTRUSTED"
 	CodeBundleDowngrade   = "E_BUNDLE_DOWNGRADE"
+	CodeLimitTooHigh      = "E_LIMIT_TOO_HIGH"
 	// Phase 4b (cloud).
 	CodeEndpointPrivate        = "E_ENDPOINT_PRIVATE"
 	CodeCloudAccountNotAllowed = "E_CLOUD_ACCOUNT_NOT_ALLOWED"
