@@ -19,4 +19,5 @@ var Tools = []Guidance{
 	{Tool: "grype", Purpose: "second SCA/image opinion for cross-tool dedupe", Brew: "brew install grype", Apt: "curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin", Release: "https://github.com/anchore/grype/releases"},
 	{Tool: "semgrep", Purpose: "dataflow-aware SAST rules", Brew: "brew install semgrep", Apt: "python3 -m pip install semgrep", Release: "https://github.com/semgrep/semgrep/releases"},
 	{Tool: "prowler", Purpose: "AWS/Azure/GCP posture checks", Brew: "pipx install prowler", Apt: "python3 -m pip install prowler", Release: "https://github.com/prowler-cloud/prowler/releases"},
+	{Tool: "chromium", Purpose: "JS rendering for SPA crawling (Google Chrome also works)", Brew: "brew install chromium", Apt: "sudo apt install chromium", Release: "https://www.chromium.org/getting-involved/download-chromium/"},
 }

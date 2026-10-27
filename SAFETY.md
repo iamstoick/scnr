@@ -52,6 +52,13 @@ These invariants are enforced in code and tests, not by policy alone.
    rebinding of a private name to another private address during the run
    is not detected there. These flags are verified against fake binaries in
    tests; nuclei is not exercised against a live network in CI.
+   *Residual (browser):* the SPA renderer drives system Chrome, which
+   resolves and connects on its own like nuclei. It navigates only to
+   scope-admitted URLs and only when the hostname is an IP literal or
+   pinned to exactly one address; multi-address or unpinned public names
+   are never rendered. It runs headless with a throwaway profile, no
+   extensions, images off, and is a fallback for JS-only pages only.
+   Chrome itself is never exercised against a live network in CI.
 6. **Rate and concurrency are capped.** Private: 500 conn/s, 64 per host,
    20 HTTP rps/host. Public: 100, 16, 10. Raising above 2x needs
    `--i-understand-rate-limits` and is audited. CIDR caps: private <= /16,

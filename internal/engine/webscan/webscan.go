@@ -148,6 +148,9 @@ func (e *Engine) Plan(_ context.Context, t domain.Target, o engine.Options) (eng
 	if o.Auth != nil && o.Auth.HasLogin() {
 		summary += fmt.Sprintf("; login as %q (single attempt, origin must match)", o.Auth.LoginUser())
 	}
+	if _, ok := FindBrowser(); ok {
+		summary += fmt.Sprintf("; JS rendering for JS-only pages (up to %d per target)", defaultMaxRenders)
+	}
 	rps := 10
 	if o.Limiter != nil && o.Limiter.HTTPRPSPerHost > 0 {
 		rps = o.Limiter.HTTPRPSPerHost
@@ -324,9 +327,17 @@ func (s *urlSet) list() []string {
 func (e *Engine) runIntrusive(ctx context.Context, t domain.Target, base *url.URL, o engine.Options, client *http.Client, assetKey string, red *safety.Redactor, seeds []string, sessNames []string, emit engine.EmitFunc) (engine.Stats, error) {
 	var stats engine.Stats
 	deep := o.Profile.Name == "deep"
+	var renderer Renderer
+	if bin, ok := FindBrowser(); ok {
+		renderer = &ChromeRenderer{Binary: bin, Dialer: o.Dialer, Scope: urlScopeFilter(base, o), Log: o.Log}
+		if o.Log != nil {
+			o.Log.Info("webscan: JS rendering enabled", "browser", bin)
+		}
+	}
 	crawler := &Crawler{
 		Client: client, Scope: urlScopeFilter(base, o),
 		Limits: DefaultCrawlLimits(deep), Origin: base, Seeds: seeds, Log: o.Log,
+		Render: renderer,
 	}
 	var pages []Page
 	cstats, err := crawler.Crawl(ctx, base, func(p Page) error {

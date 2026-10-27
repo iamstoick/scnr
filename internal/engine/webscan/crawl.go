@@ -80,12 +80,14 @@ type SkippedLink struct {
 
 // CrawlStats accounts the crawl. Truncated means a budget stopped
 // discovery early (the engine emits web.crawl-truncated and a
-// PartialError). Requests counts every fetch including robots.txt.
+// PartialError). Requests counts every fetch including robots.txt and
+// rendered pages; Rendered counts the browser renders alone.
 type CrawlStats struct {
 	URLs      int
 	Forms     int
 	Pairs     int
 	Requests  int
+	Rendered  int
 	Truncated bool
 	Skipped   []SkippedLink
 }
@@ -111,6 +113,47 @@ type Crawler struct {
 	// Robots overrides the fetched robots.txt (tests); nil fetches it.
 	Robots *Robots
 	Log    *slog.Logger
+	// Render, when non-nil, re-fetches pages through a browser when
+	// static parsing finds no links or forms (SPA fallback). Nil means
+	// static parsing only.
+	Render Renderer
+	// MaxRenders caps rendered pages per crawl; <=0 means the default.
+	MaxRenders int
+}
+
+// maxRenders resolves the render budget.
+func (c *Crawler) maxRenders() int {
+	if c.MaxRenders > 0 {
+		return c.MaxRenders
+	}
+	return defaultMaxRenders
+}
+
+// renderFallback renders u when it is in scope and budget remains. One
+// failed render still consumes one budget slot, bounding concurrent waste.
+func (c *Crawler) renderFallback(ctx context.Context, u *url.URL, mu *sync.Mutex, st *CrawlStats) ([]byte, bool) {
+	if c.Render == nil {
+		return nil, false
+	}
+	if c.Scope != nil && !c.Scope(u.String()) {
+		return nil, false
+	}
+	mu.Lock()
+	if st.Rendered >= c.maxRenders() {
+		mu.Unlock()
+		return nil, false
+	}
+	st.Rendered++
+	st.Requests++
+	mu.Unlock()
+	rendered, err := c.Render.Render(ctx, u.String())
+	if err != nil {
+		if c.Log != nil {
+			c.Log.Debug("webscan: render fallback failed", "url", u.String(), "err", err)
+		}
+		return nil, false
+	}
+	return rendered, true
 }
 
 type crawlJob struct {
@@ -304,6 +347,13 @@ func (c *Crawler) fetchPage(ctx context.Context, job crawlJob, params []string, 
 		return page, nil, false // params still probed; nothing to discover
 	}
 	base, links, forms := extractLinks(body, job.u)
+	if len(links) == 0 && len(forms) == 0 {
+		// Likely a JS shell: give the browser one chance, then run the
+		// same screening below over whatever it serialised.
+		if rendered, ok := c.renderFallback(ctx, job.u, mu, st); ok {
+			base, links, forms = extractLinks(rendered, job.u)
+		}
+	}
 	if originID(base) != origin {
 		base = job.u // off-origin <base href> is ignored, not followed
 	}
