@@ -176,7 +176,7 @@ func Run(ctx context.Context, d Deps) (ScanRequest, error) {
 		req.AckAuthorized = true
 	}
 
-	// Step 3b: active checks (URL targets only). The gate still requires
+	// Step 3b: active checks (URL and single-host targets only). The gate still requires
 	// scope.intrusive_allow plus a private target or ownership proof.
 	if t.Type == domain.TargetURL {
 		active := false

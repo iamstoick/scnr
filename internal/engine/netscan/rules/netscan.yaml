@@ -118,3 +118,102 @@ why: Redirects to internal or unexpected addresses can indicate misconfiguration
 fix: Review the redirect target. If it is unintended, fix the application's redirect configuration; if it is intended, add it to scope.allow to include it in future scans.
 safety: safe
 tags: [web]
+---
+id: net.mysql.version
+engine: netscan
+title: MySQL server version
+severity: info
+cwe: CWE-200
+what: A MySQL or MariaDB server answered with this version in its greeting. No login was attempted.
+why: Version inventory tells you what you are running so you can check it against vendor security announcements.
+fix: No action needed for this finding itself. Compare the version against current MySQL or MariaDB releases and plan upgrades for unsupported lines.
+safety: safe
+tags: [network, database, inventory]
+---
+id: net.mysql.no-tls
+engine: netscan
+title: MySQL server does not offer TLS
+severity: medium
+cwe: CWE-319
+what: The server greeting does not advertise TLS support, so clients log in and query over a plaintext connection.
+why: Anyone able to observe the network path sees database credentials and query data, and can modify traffic in transit.
+fix: Enable TLS on the server (ssl-ca/ssl-cert/ssl-key or the distribution defaults) and require it with require_secure_transport=ON.
+safety: safe
+tags: [network, database, tls]
+---
+id: net.mysql.legacy-auth
+engine: netscan
+title: MySQL pre-4.1 password authentication in use
+severity: medium
+cwe: CWE-327
+what: The server (or one of its accounts) uses the pre-MySQL-4.1 password scheme, whose hashes are trivially cracked.
+why: Short hashes from this scheme fall to brute force in hours, so any disclosure of the user table or captured login exposes the passwords.
+fix: Migrate every account to caching_sha2_password (or mysql_native_password where older clients require it) and set new passwords.
+safety: safe
+tags: [network, database]
+---
+id: net.mysql.local-infile
+engine: netscan
+title: MySQL LOAD DATA LOCAL INFILE enabled
+severity: medium
+cwe: CWE-1188
+what: The server has local_infile enabled, permitting LOAD DATA LOCAL INFILE statements.
+why: This statement makes the server request files from the connecting client, so a compromised or malicious server (or SQL injection reaching it) can read arbitrary files from application hosts.
+fix: Set local_infile=OFF unless an application genuinely needs it, and audit any workflow that does.
+safety: safe
+tags: [network, database]
+---
+id: net.mysql.databases
+engine: netscan
+title: MySQL user databases
+severity: info
+cwe: CWE-200
+what: These non-system databases exist on the server, listed with the credentials from --auth-file.
+why: Database inventory shows what data this instance holds so each database can be matched to an owner and a backup.
+fix: No action needed for this finding itself. Remove databases that have no owner.
+safety: safe
+tags: [network, database, inventory]
+---
+id: net.mysql.remote-root
+engine: netscan
+title: MySQL root login allowed from remote hosts
+severity: high
+cwe: CWE-284
+what: A root account accepts connections from a non-loopback host.
+why: Root can read, change and delete everything on the server. A remotely reachable root login is the first account password guessing attacks try.
+fix: Restrict root to localhost (or delete remote root accounts) and use named, least-privilege accounts for applications.
+safety: safe
+tags: [network, database]
+---
+id: net.mysql.anonymous-user
+engine: netscan
+title: MySQL anonymous account exists
+severity: high
+cwe: CWE-284
+what: An account with an empty username exists on the server.
+why: Anonymous accounts let anyone connect without proving who they are; with a remote host part they are reachable from the network.
+fix: Drop anonymous accounts (DROP USER ''@'host' for each one shown) and re-run the scan to confirm.
+safety: safe
+tags: [network, database]
+---
+id: net.mysql.empty-password
+engine: netscan
+title: MySQL account with an empty password
+severity: high
+cwe: CWE-521
+what: A password-authenticated account reachable from the network has an empty password.
+why: Anyone who can reach the port can log in as this account with no credential at all.
+fix: Set a strong password (ALTER USER ... IDENTIFIED BY ...) or drop the account, then re-run the scan to confirm.
+safety: safe
+tags: [network, database]
+---
+id: net.mysql.cve-2012-2122
+engine: netscan
+title: MySQL authentication bypass (CVE-2012-2122)
+severity: critical
+cwe: CWE-681
+what: A wrong-password login was accepted, proving this server is vulnerable to the CVE-2012-2122 authentication bypass. Only a random wrong password was sent; no real credential was used or learned.
+why: The bug lets anyone log in as any user (including root) by retrying a wrong password, giving full database access without credentials.
+fix: Upgrade MySQL or MariaDB to a fixed release immediately (any supported line) and rotate all database credentials in case the bypass was already used.
+safety: intrusive
+tags: [network, database]

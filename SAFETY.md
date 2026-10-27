@@ -309,7 +309,10 @@ These invariants are enforced in code and tests, not by policy alone.
     `scope.intrusive_allow` and a private target or ownership
     verification; nuclei's argv is unchanged by the flag. Auth material
     is applied only to the authorised origin and masked everywhere as a
-    literal.
+    literal. The one non-HTTP active check is the MySQL CVE-2012-2122
+    probe (single-host targets only, same gate): bounded wrong-password
+    logins with a random password, never a guess at a real credential,
+    and no SQL statement is issued even when the bypass succeeds.
     *Residual:* redirect follows of probe requests are bounded by the
     client's 5-hop cap but not counted against the probe budget; a logout
     whose wording is not in the destructive-word list ends the probe

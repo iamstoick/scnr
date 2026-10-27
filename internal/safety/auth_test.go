@@ -195,3 +195,108 @@ func TestRedactorLiterals(t *testing.T) {
 		t.Fatalf("key should stay visible: %q", got)
 	}
 }
+
+func TestLoadAuthFileMySQL(t *testing.T) {
+	a, err := LoadAuthFile(writeAuthFile(t, 0o600, "mysql:\n  user: auditor\n  password: s3cret\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !a.HasDBCredentials() || a.DBUser() != "auditor" {
+		t.Fatalf("db login: %+v", a)
+	}
+	// Empty passwords are explicit and allowed; absence of the section is not a login.
+	b, err := LoadAuthFile(writeAuthFile(t, 0o600, "mysql:\n  user: root\n  password: \"\"\n"))
+	if err != nil || !b.HasDBCredentials() {
+		t.Fatalf("empty password: %v %+v", err, b)
+	}
+	c, err := LoadAuthFile(writeAuthFile(t, 0o600, goodAuthYAML))
+	if err != nil || c.HasDBCredentials() {
+		t.Fatalf("headers-only file has db login: %v", err)
+	}
+	// The mysql login composes with headers/cookies in one file.
+	d, err := LoadAuthFile(writeAuthFile(t, 0o600, goodAuthYAML+"mysql:\n  user: u\n  password: p\n"))
+	if err != nil || d.HeaderCount() != 1 || !d.HasDBCredentials() {
+		t.Fatalf("combined: %v %+v", err, d)
+	}
+}
+
+func TestLoadAuthFileMySQLRefusals(t *testing.T) {
+	for name, body := range map[string]string{
+		"empty user":    "mysql:\n  user: \"\"\n  password: x\n",
+		"missing user":  "mysql:\n  password: x\n",
+		"user newline":  "mysql:\n  user: \"a\\nb\"\n  password: x\n",
+		"pass newline":  "mysql:\n  user: u\n  password: \"a\\nb\"\n",
+		"user NUL":      "mysql:\n  user: \"a\\x00b\"\n  password: x\n",
+		"unknown field": "mysql:\n  user: u\n  password: x\n  db: foo\n",
+	} {
+		if _, err := LoadAuthFile(writeAuthFile(t, 0o600, body)); err == nil {
+			t.Fatalf("%s accepted", name)
+		} else if strings.Contains(err.Error(), "s3cret") || strings.Contains(err.Error(), "a\nb") {
+			t.Fatalf("%s leaked value: %v", name, err)
+		}
+	}
+	// A mysql-only section satisfies the non-empty rule.
+	if _, err := LoadAuthFile(writeAuthFile(t, 0o600, "mysql:\n  user: u\n  password: p\n")); err != nil {
+		t.Fatalf("mysql-only refused: %v", err)
+	}
+}
+
+func TestDBCredentialsOriginOnly(t *testing.T) {
+	a, err := LoadAuthFile(writeAuthFile(t, 0o600, "mysql:\n  user: auditor\n  password: s3cret\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bound := a.WithOrigin("192.168.0.136:3306")
+	if a.Origin != "" {
+		t.Fatal("WithOrigin mutated the receiver")
+	}
+	user, pass, ok := bound.DBCredentials("192.168.0.136:3306")
+	if !ok || user != "auditor" || pass != "s3cret" {
+		t.Fatalf("exact origin: %q %v", user, ok)
+	}
+	for _, origin := range []string{"192.168.0.137:3306", "192.168.0.136:3307", ""} {
+		if _, _, ok := bound.DBCredentials(origin); ok {
+			t.Fatalf("released for %q", origin)
+		}
+	}
+	if _, _, ok := a.DBCredentials("192.168.0.136:3306"); ok {
+		t.Fatal("unbound material released")
+	}
+	var nilAuth *AuthMaterial
+	if nilAuth.HasDBCredentials() || nilAuth.DBUser() != "" {
+		t.Fatal("nil material reports credentials")
+	}
+	if _, _, ok := nilAuth.DBCredentials("h:1"); ok {
+		t.Fatal("nil material released")
+	}
+	// Merge carries the file login; flags cannot add one.
+	merged := MergeAuth(a, MustParseForTest(t))
+	if !merged.HasDBCredentials() || merged.DBUser() != "auditor" {
+		t.Fatal("merge dropped db login")
+	}
+	if Merged := MergeAuth(nil, MustParseForTest(t)); Merged.HasDBCredentials() {
+		t.Fatal("flags-only merge gained db login")
+	}
+}
+
+func TestDBPasswordRedaction(t *testing.T) {
+	a, err := LoadAuthFile(writeAuthFile(t, 0o600, "mysql:\n  user: auditor\n  password: s3cret-db-pw\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundPass, foundUser := false, false
+	for _, v := range a.Values() {
+		foundPass = foundPass || v == "s3cret-db-pw"
+		foundUser = foundUser || v == "auditor"
+	}
+	if !foundPass || foundUser {
+		t.Fatalf("Values must carry the password, never the user: %q", a.Values())
+	}
+	other, err := LoadAuthFile(writeAuthFile(t, 0o600, "mysql:\n  user: auditor\n  password: different-pw\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if other.ValuesHash() == a.ValuesHash() {
+		t.Fatal("hash ignores db password")
+	}
+}

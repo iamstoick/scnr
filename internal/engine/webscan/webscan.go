@@ -142,7 +142,7 @@ func (e *Engine) Plan(_ context.Context, t domain.Target, o engine.Options) (eng
 		summary = fmt.Sprintf("passive checks plus %d safe templates, then active checks (crawler + inert-marker probes, up to %d extra requests)", safe, budget)
 		n += budget
 	}
-	if o.Auth != nil {
+	if o.Auth != nil && o.Auth.HeaderCount()+o.Auth.CookieCount() > 0 {
 		summary += fmt.Sprintf("; authenticated: yes (%d headers, %d cookies)", o.Auth.HeaderCount(), o.Auth.CookieCount())
 	}
 	rps := 10

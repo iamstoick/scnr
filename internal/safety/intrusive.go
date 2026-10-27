@@ -8,11 +8,14 @@ import (
 	"github.com/iamstoick/scnr/internal/domain"
 )
 
-// IntrusiveGate decides, per target, whether active (DAST) checks may run.
-// All three must hold: --allow-intrusive was passed, the target matches
-// scope.intrusive_allow (deny still wins), and the target is private or
-// carries a non-expired ownership verification. Interactive consent alone
-// is never sufficient for intrusive checks on public targets.
+// IntrusiveGate decides, per target, whether active checks may run: DAST
+// probes for URL targets, database vulnerability probes for host
+// targets. All three must hold: --allow-intrusive was passed, the target
+// matches scope.intrusive_allow (deny still wins), and the target is
+// private or carries a non-expired ownership verification. Interactive
+// consent alone is never sufficient for intrusive checks on public
+// targets. CIDR targets are refused: multi-host login-attempt loops are
+// never started implicitly; narrow to one --type host address instead.
 type IntrusiveGate struct {
 	Scope    *Scope
 	Verified VerifiedFunc
@@ -28,8 +31,8 @@ func (g *IntrusiveGate) Decide(ctx context.Context, d *Decision, allowFlag bool)
 	if !allowFlag {
 		return false, "pass --allow-intrusive to run active checks", nil
 	}
-	if d.Target.Type != domain.TargetURL {
-		return false, "active checks apply to URL targets only — scan an https:// address to use them", nil
+	if d.Target.Type != domain.TargetURL && d.Target.Type != domain.TargetHost {
+		return false, "active checks apply to URL and single-host targets only — narrow a range to one --type host address to use them", nil
 	}
 	host := d.Target.Hostname
 	if host == "" {

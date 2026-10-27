@@ -35,7 +35,9 @@ func TestIntrusiveGateTable(t *testing.T) {
 		wantErr   bool
 	}{
 		{"no flag", &Decision{Target: urlTarget("http://192.168.1.10/", "192.168.1.10"), Addrs: []netip.Addr{priv}}, false, []string{"192.168.1.10"}, nil, nil, false, "--allow-intrusive", false},
-		{"non-URL target", &Decision{Target: domain.Target{Raw: "192.168.1.10", Type: domain.TargetHost, Value: "192.168.1.10", Hostname: "192.168.1.10"}, Addrs: []netip.Addr{priv}}, true, []string{"192.168.1.10"}, nil, nil, false, "URL targets only", false},
+		{"host allowed", &Decision{Target: domain.Target{Raw: "192.168.1.10", Type: domain.TargetHost, Value: "192.168.1.10", Hostname: "192.168.1.10"}, Addrs: []netip.Addr{priv}}, true, []string{"192.168.1.10"}, nil, nil, true, "", false},
+		{"host not in intrusive_allow", &Decision{Target: domain.Target{Raw: "192.168.1.10", Type: domain.TargetHost, Value: "192.168.1.10", Hostname: "192.168.1.10"}, Addrs: []netip.Addr{priv}}, true, []string{"10.0.0.0/8"}, nil, nil, false, "intrusive_allow", false},
+		{"cidr refused", &Decision{Target: domain.Target{Raw: "192.168.1.0/24", Type: domain.TargetCIDR, Value: "192.168.1.0/24"}, Addrs: []netip.Addr{priv}}, true, []string{"192.168.0.0/16"}, nil, nil, false, "single-host", false},
 		{"not in intrusive_allow", &Decision{Target: urlTarget("http://192.168.1.10/", "192.168.1.10"), Addrs: []netip.Addr{priv}}, true, []string{"10.0.0.0/8"}, nil, nil, false, "intrusive_allow", false},
 		{"empty intrusive_allow", &Decision{Target: urlTarget("http://192.168.1.10/", "192.168.1.10"), Addrs: []netip.Addr{priv}}, true, nil, nil, nil, false, "intrusive_allow", false},
 		{"deny wins", &Decision{Target: urlTarget("http://192.168.1.10/", "192.168.1.10"), Addrs: []netip.Addr{priv}}, true, []string{"192.168.0.0/16"}, []string{"192.168.1.10"}, nil, false, "deny entry", false},

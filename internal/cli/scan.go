@@ -100,7 +100,7 @@ func scanFlags(f *pflag.FlagSet, req *wizard.ScanRequest, engines, skip *string,
 	f.StringVar(&req.Diff, "diff", "", "print new/fixed findings vs a previous scan: latest|SCAN-ID")
 	f.StringVar(&req.Templates, "templates", "", "directory of extra webscan templates (validated, safe only)")
 	f.BoolVar(&req.AllowIntrusive, "allow-intrusive", false, "run active checks (crawler + inert-marker probes) where the intrusive gate allows")
-	f.StringVar(&req.AuthFile, "auth-file", "", "YAML file with authenticated-scan headers/cookies (mode 0600, owned by you)")
+	f.StringVar(&req.AuthFile, "auth-file", "", "YAML file with authenticated-scan headers/cookies/mysql login (mode 0600, owned by you)")
 	f.StringArrayVar(&req.Headers, "header", nil, "extra request header as \"Name: value\" (repeatable; interactive use only, never scheduled)")
 	f.StringArrayVar(&req.Cookies, "cookie", nil, "extra request cookie as \"name=value\" (repeatable; interactive use only, never scheduled)")
 }
@@ -434,7 +434,7 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 			}
 		}
 		intrusive := false
-		if req.AllowIntrusive && t.Type == domain.TargetURL {
+		if req.AllowIntrusive && (t.Type == domain.TargetURL || t.Type == domain.TargetHost) {
 			var reason string
 			var derr error
 			if intrusive, reason, derr = ig.Decide(ctx, dec, true); derr != nil {

@@ -216,8 +216,16 @@ func (e *Engine) Plan(_ context.Context, t domain.Target, o engine.Options) (eng
 	if o.Limiter != nil {
 		rate = o.Limiter.RatePerSec
 	}
+	summary := fmt.Sprintf("%d host(s) x %d port(s) TCP connect, banners, TLS checks at <= %d conn/s", len(hosts), len(ports), rate)
+	if o.Auth.HasDBCredentials() {
+		summary += fmt.Sprintf("; mysql authenticated enumeration as %q", o.Auth.DBUser())
+	}
+	if o.Intrusive {
+		summary += fmt.Sprintf("; mysql CVE-2012-2122 probe on MySQL 5.x greetings (up to %d logins)", mysqlCVEAttempts)
+		n += mysqlCVEAttempts
+	}
 	return engine.Plan{
-		Summary:     fmt.Sprintf("%d host(s) x %d port(s) TCP connect, banners, TLS checks at <= %d conn/s", len(hosts), len(ports), rate),
+		Summary:     summary,
 		EstRequests: n,
 		EstDuration: time.Duration(n/rate+1)*time.Second + time.Duration(len(hosts))*connectTimeout,
 		Network:     true,
@@ -245,22 +253,32 @@ func (e *Engine) Run(ctx context.Context, t domain.Target, o engine.Options, emi
 		defer emitMu.Unlock()
 		return emit(f)
 	}
+	probes := 0
 	for _, host := range hosts {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		if err := e.scanHost(ctx, host, ports, conc, dialer, t, o, safeEmit); err != nil {
+		n, err := e.scanHost(ctx, host, ports, conc, dialer, t, o, safeEmit)
+		probes += n
+		if err != nil {
+			if o.Stats != nil {
+				o.Stats(engine.Stats{Probes: probes})
+			}
 			return err
 		}
+	}
+	if o.Stats != nil {
+		o.Stats(engine.Stats{Probes: probes})
 	}
 	return nil
 }
 
 type hostResult struct {
 	reached bool
+	probes  int
 }
 
-func (e *Engine) scanHost(ctx context.Context, host string, ports []int, conc int64, dialer *safety.Dialer, t domain.Target, o engine.Options, emit engine.EmitFunc) error {
+func (e *Engine) scanHost(ctx context.Context, host string, ports []int, conc int64, dialer *safety.Dialer, t domain.Target, o engine.Options, emit engine.EmitFunc) (int, error) {
 	sem := semaphore.NewWeighted(conc)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -289,33 +307,42 @@ func (e *Engine) scanHost(ctx context.Context, host string, ports []int, conc in
 			mu.Lock()
 			res.reached = true
 			mu.Unlock()
-			if err := e.probe(ctx, conn, dialer, host, port, assetKey, t, o, emit); err != nil {
-				mu.Lock()
-				if firstErr == nil {
-					firstErr = err
-				}
-				mu.Unlock()
+			n, err := e.probe(ctx, conn, dialer, host, port, assetKey, t, o, emit)
+			mu.Lock()
+			res.probes += n
+			if err != nil && firstErr == nil {
+				firstErr = err
 			}
+			mu.Unlock()
 		}(port)
 	}
 	wg.Wait()
 	if firstErr != nil {
-		return firstErr
+		return res.probes, firstErr
 	}
 	if !res.reached && o.Log != nil {
 		o.Log.Info("host unreachable on all probed ports", "host", host, "ports", len(ports))
 	}
-	return ctx.Err()
+	return res.probes, ctx.Err()
 }
 
-// probe handles one open port: banner, TLS, HTTP label, rules. Every
-// follow-up connection (TLS probes) goes through the same scope-checked
-// dialer as the initial connect.
-func (e *Engine) probe(ctx context.Context, conn net.Conn, dialer *safety.Dialer, host string, port int, assetKey string, t domain.Target, o engine.Options, emit engine.EmitFunc) error {
-	banner := readBanner(conn)
+// probe handles one open port: banner, TLS, HTTP label, MySQL audit,
+// rules. Every follow-up connection (TLS and MySQL probes) goes through
+// the same scope-checked dialer as the initial connect. It returns the
+// intrusive probe attempts made on this port.
+func (e *Engine) probe(ctx context.Context, conn net.Conn, dialer *safety.Dialer, host string, port int, assetKey string, t domain.Target, o engine.Options, emit engine.EmitFunc) (probes int, err error) {
+	raw := readBannerRaw(conn)
+	banner := sanitizeBanner(raw)
 	conn.Close() //nolint:errcheck // probe socket; banner already captured
 	loc := net.JoinHostPort(host, strconv.Itoa(port))
 	service := guessService(port, banner)
+	// A greeting that parses is ground truth: it identifies MySQL on
+	// any port, including non-standard ones whose banner carries no
+	// "mysql" text for the heuristic above.
+	greeting, isMySQL := parseMySQLGreeting(raw)
+	if isMySQL {
+		service = "mysql"
+	}
 	red := o.Redactor
 	if red == nil {
 		red = safety.NewRedactor()
@@ -329,12 +356,12 @@ func (e *Engine) probe(ctx context.Context, conn net.Conn, dialer *safety.Dialer
 	if isTLS {
 		tlsEv, tlsFindings, err := e.checkTLS(ctx, dialer, host, assetKey, loc)
 		if err != nil {
-			return err
+			return probes, err
 		}
 		evidence = append(evidence, tlsEv...)
 		for _, f := range tlsFindings {
 			if err := emit(f); err != nil {
-				return err
+				return probes, err
 			}
 		}
 		if len(tlsEv) > 0 && service == "" {
@@ -357,7 +384,7 @@ func (e *Engine) probe(ctx context.Context, conn net.Conn, dialer *safety.Dialer
 			f := e.rules.NewFinding("web.redirect-out-of-scope", assetKey, redir.From, domain.Confirmed)
 			f.Evidence = []domain.Evidence{red.TextEvidence("response", redir.From, "Location: "+redir.To)}
 			if err := emit(f); err != nil {
-				return err
+				return probes, err
 			}
 		}
 	}
@@ -370,7 +397,7 @@ func (e *Engine) probe(ctx context.Context, conn net.Conn, dialer *safety.Dialer
 	}
 	f.Evidence = evidence
 	if err := emit(f); err != nil {
-		return err
+		return probes, err
 	}
 	if name, ok := adminPorts[port]; ok {
 		f := e.rules.NewFinding("net.exposed-admin-port", assetKey, loc, domain.Firm)
@@ -380,7 +407,7 @@ func (e *Engine) probe(ctx context.Context, conn net.Conn, dialer *safety.Dialer
 		}
 		f.Evidence = evidence
 		if err := emit(f); err != nil {
-			return err
+			return probes, err
 		}
 	}
 	if name, ok := dbPorts[port]; ok {
@@ -391,22 +418,39 @@ func (e *Engine) probe(ctx context.Context, conn net.Conn, dialer *safety.Dialer
 		}
 		f.Evidence = evidence
 		if err := emit(f); err != nil {
-			return err
+			return probes, err
 		}
 	}
-	return nil
+	if isMySQL {
+		n, err := e.auditMySQL(ctx, dialer, host, loc, assetKey, greeting, o, red, emit)
+		probes += n
+		if err != nil {
+			return probes, err
+		}
+	}
+	return probes, nil
 }
 
 func looksLikeTLSPort(port int) bool { return port%1000 == 443 }
 
-func readBanner(conn net.Conn) string {
+// readBannerRaw captures the single banner read as raw bytes so binary
+// greetings (MySQL) can be parsed as well as displayed.
+func readBannerRaw(conn net.Conn) []byte {
 	_ = conn.SetReadDeadline(time.Now().Add(bannerTimeout))
 	buf := make([]byte, bannerBytes)
 	n, _ := conn.Read(buf)
 	if n == 0 {
+		return nil
+	}
+	return buf[:n]
+}
+
+// sanitizeBanner renders raw banner bytes for display and matching.
+func sanitizeBanner(raw []byte) string {
+	if len(raw) == 0 {
 		return ""
 	}
-	return strings.TrimSpace(safety.StripControl(string(buf[:n])))
+	return strings.TrimSpace(safety.StripControl(string(raw)))
 }
 
 func guessService(port int, banner string) string {
@@ -439,14 +483,17 @@ func guessService(port int, banner string) string {
 	return ""
 }
 
-// checkTLS performs the default handshake (to capture the chain) and legacy
-// version probes. InsecureSkipVerify is used only to obtain the peer
-// certificate for inspection; trust is then evaluated explicitly with
-// x509.Verify so the result can be reported rather than hidden. The TCP
-// connection comes from the scope-checked dialer (DNS pinning, deny list,
-// rate limit), never from a raw net.Dialer on the hostname. Ordinary
-// connect/handshake failures yield no evidence; a safety refusal is returned
-// so the scan stops rather than silently skipping the check.
+// checkTLS performs the default handshake (to capture the chain), legacy
+// version probes, and per-cipher acceptance probes for TLS 1.0-1.2.
+// InsecureSkipVerify is used only to obtain the peer certificate for
+// inspection; trust is then evaluated explicitly with x509.Verify so the
+// result can be reported rather than hidden. The TCP connection comes from
+// the scope-checked dialer (DNS pinning, deny list, rate limit), never from
+// a raw net.Dialer on the hostname. Ordinary connect/handshake failures
+// yield no evidence; a safety refusal is returned so the scan stops rather
+// than silently skipping the check. TLS 1.3 ciphers are not individually
+// probeable with crypto/tls, so 1.3 is reported as the negotiated version
+// only.
 func (e *Engine) checkTLS(ctx context.Context, dialer *safety.Dialer, host string, assetKey, loc string) ([]domain.Evidence, []domain.Finding, error) {
 	serverName := host
 	if ip, err := netip.ParseAddr(host); err == nil && ip.IsValid() {

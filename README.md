@@ -141,6 +141,9 @@ scnr scan 10.0.0.0/24 --profile quick --ack-authorized --non-interactive
 # Custom ports and gentler rate
 scnr scan 10.0.0.5 --ports 22,80,8000-8100 --rate 50 --ack-authorized
 
+# Audit a MySQL server (greeting/version always; enumeration with a login)
+scnr scan 192.168.0.136 --type host --ports 3306 --auth-file ./auth.yaml --ack-authorized
+
 # Raise above 2x defaults (audited, needs the explicit flag)
 scnr scan 10.0.0.0/24 --rate 1000 --i-understand-rate-limits --ack-authorized
 

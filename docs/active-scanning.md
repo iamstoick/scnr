@@ -8,7 +8,8 @@ opt-in, inert by construction, and fenced by a dedicated gate.
 
 ## The gate
 
-Active checks run for a URL target only when **all** of these hold:
+Active checks run for a URL or single-host target only when **all** of these hold
+(CIDR ranges are refused — narrow to one `--type host` address):
 
 1. You passed `--allow-intrusive`.
 2. The target matches `scope.intrusive_allow` in `scnr.yaml` (same entry
@@ -43,6 +44,11 @@ row, and as an "Active checks ran" banner in HTML/JSON reports.
   parameter plus the server's own error text.
 - **Budgets**: hitting any cap emits a `*-truncated` finding and marks
   the engine `partial`, so truncated runs never mark findings fixed.
+- **MySQL CVE-2012-2122 probe** (host targets): when a greeting parses
+  as MySQL 5.0–5.5, up to 300 wrong-password logins as `root` with a
+  random password — success is only possible through the memcmp
+  fail-open bug. No SQL is ever issued, and modern versions get zero
+  login attempts. Reported as `net.mysql.cve-2012-2122` (critical).
 
 Everything is GET or HEAD except `safety: intrusive` templates you supply
 via `--templates` (POST, bodies ≤ 4 KiB, validated at load). Nuclei is
@@ -57,10 +63,14 @@ headers:
   Authorization: "Bearer …"
 cookies:
   session: "…"
+mysql:
+  user: auditor
+  password: "…"
 ```
 
 ```sh
 scnr scan https://app.example/ --allow-intrusive --auth-file auth.yaml
+scnr scan 192.168.0.136 --type host --ports 3306 --auth-file auth.yaml --ack-authorized
 ```
 
 The file must be mode `0600`, owned by you, and not a symlink; `--header
@@ -88,4 +98,10 @@ scnr schedule add --name nightly --cron "0 2 * * *" -- \
 
 # Explain the gate for a target before scanning
 scnr scope check https://app.example/
+
+# MySQL audit: greeting/version always; login enumeration with --auth-file
+scnr scan 192.168.0.136 --type host --ports 3306 --auth-file ./auth.yaml --ack-authorized
+
+# Add the CVE-2012-2122 probe (needs intrusive_allow, single host only)
+scnr scan 192.168.0.136 --type host --ports 3306 --allow-intrusive --ack-authorized
 ```

@@ -16,16 +16,21 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// AuthMaterial carries authenticated-scan credentials (headers, cookies)
-// for exactly one origin. Values are unexported, never formatted and
-// never serialised; Apply copies them onto a request only when the
-// request's host:port equals Origin.
+// AuthMaterial carries authenticated-scan credentials (headers, cookies,
+// database login) for exactly one origin. Values are unexported, never
+// formatted and never serialised; Apply copies them onto a request only
+// when the request's host:port equals Origin, and DBCredentials releases
+// the database login only for that same origin.
 type AuthMaterial struct {
 	// Origin is the "host:port" authorised to receive the material, taken
-	// from the target URL. Empty matches nothing.
+	// from the target URL (web) or the probed host:port (database).
+	// Empty matches nothing.
 	Origin  string
 	headers http.Header
 	cookies []*http.Cookie
+	dbUser  string
+	dbPass  string
+	hasDB   bool
 }
 
 // MaxAuthFileBytes caps --auth-file at 64 KiB.
@@ -34,12 +39,22 @@ const MaxAuthFileBytes = 64 << 10
 type authFile struct {
 	Headers map[string]string `yaml:"headers"`
 	Cookies map[string]string `yaml:"cookies"`
+	Mysql   *mysqlAuthFile    `yaml:"mysql"`
+}
+
+// mysqlAuthFile is the optional database login: {mysql: {user: name,
+// password: secret}}. The password may be empty (an explicitly
+// passwordless login); absence of the section means no database login.
+type mysqlAuthFile struct {
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
 }
 
 // LoadAuthFile reads an --auth-file: strict YAML
-// ({headers: {Name: value}, cookies: {name: value}}), at most 64 KiB,
-// mode 0600, owned by the current uid, never a symlink. Errors name the
-// path and the reason only: values never appear in them.
+// ({headers: {Name: value}, cookies: {name: value}, mysql: {user,
+// password}}), at most 64 KiB, mode 0600, owned by the current uid,
+// never a symlink. Errors name the path and the reason only: values
+// never appear in them.
 func LoadAuthFile(path string) (*AuthMaterial, error) {
 	if err := CheckPrivateFile(path); err != nil {
 		return nil, err
@@ -83,8 +98,20 @@ func LoadAuthFile(path string) (*AuthMaterial, error) {
 		}
 		a.cookies = append(a.cookies, &http.Cookie{Name: k, Value: v})
 	}
-	if len(a.headers) == 0 && len(a.cookies) == 0 {
-		return nil, fmt.Errorf("auth file %s: no headers or cookies", path)
+	if af.Mysql != nil {
+		user := strings.TrimSpace(af.Mysql.User)
+		if user == "" {
+			return nil, fmt.Errorf("auth file %s: mysql user is empty", path)
+		}
+		// NUL would truncate the wire encoding and log the password
+		// beside it; line breaks would corrupt error text. Reject both.
+		if strings.ContainsAny(user, "\r\n\x00") || strings.ContainsAny(af.Mysql.Password, "\r\n\x00") {
+			return nil, fmt.Errorf("auth file %s: mysql credentials contain a line break or NUL", path)
+		}
+		a.dbUser, a.dbPass, a.hasDB = user, af.Mysql.Password, true
+	}
+	if len(a.headers) == 0 && len(a.cookies) == 0 && !a.hasDB {
+		return nil, fmt.Errorf("auth file %s: no headers, cookies or mysql credentials", path)
 	}
 	return a, nil
 }
@@ -123,7 +150,9 @@ func ParseAuthLiterals(headers, cookies []string) (*AuthMaterial, error) {
 }
 
 // MergeAuth combines file and flag material (file first). Either may be
-// nil; the result shares no mutable state with the inputs.
+// nil; the result shares no mutable state with the inputs. Only the file
+// can carry a database login (there are no --db-user/--db-password flags:
+// passwords must never appear on a command line).
 func MergeAuth(file, flags *AuthMaterial) *AuthMaterial {
 	out := &AuthMaterial{headers: http.Header{}}
 	for _, src := range []*AuthMaterial{file, flags} {
@@ -139,6 +168,9 @@ func MergeAuth(file, flags *AuthMaterial) *AuthMaterial {
 			cp := *c
 			out.cookies = append(out.cookies, &cp)
 		}
+		if src.hasDB && !out.hasDB {
+			out.dbUser, out.dbPass, out.hasDB = src.dbUser, src.dbPass, true
+		}
 	}
 	return out
 }
@@ -153,6 +185,7 @@ func (a *AuthMaterial) WithOrigin(origin string) *AuthMaterial {
 		cp := *c
 		out.cookies = append(out.cookies, &cp)
 	}
+	out.dbUser, out.dbPass, out.hasDB = a.dbUser, a.dbPass, a.hasDB
 	return out
 }
 
@@ -195,6 +228,29 @@ func (a *AuthMaterial) Apply(req *http.Request) {
 func (a *AuthMaterial) HeaderCount() int { return len(a.headers) }
 func (a *AuthMaterial) CookieCount() int { return len(a.cookies) }
 
+// HasDBCredentials reports whether a database login is present (origin
+// not yet checked).
+func (a *AuthMaterial) HasDBCredentials() bool { return a != nil && a.hasDB }
+
+// DBUser returns the database login name for plan lines. Usernames are
+// not secrets; the password is never exposed except via DBCredentials.
+func (a *AuthMaterial) DBUser() string {
+	if a == nil || !a.hasDB {
+		return ""
+	}
+	return a.dbUser
+}
+
+// DBCredentials releases the database login only when origin equals the
+// authorised Origin — the database equivalent of Apply's origin check.
+// Anything else, including an empty Origin, gets nothing.
+func (a *AuthMaterial) DBCredentials(origin string) (user, pass string, ok bool) {
+	if a == nil || !a.hasDB || a.Origin == "" || origin != a.Origin {
+		return "", "", false
+	}
+	return a.dbUser, a.dbPass, true
+}
+
 // CookieNames lists the session cookie names (names only, never values)
 // so the prober can notice when the server clears one.
 func (a *AuthMaterial) CookieNames() []string {
@@ -207,7 +263,8 @@ func (a *AuthMaterial) CookieNames() []string {
 }
 
 // Values returns every secret value. Handle with care: the only sanctioned
-// use is seeding the run redactor's literal list.
+// use is seeding the run redactor's literal list. The database username
+// is not a secret (findings name accounts) and is deliberately excluded.
 func (a *AuthMaterial) Values() []string {
 	var out []string
 	for _, vs := range a.headers {
@@ -215,6 +272,9 @@ func (a *AuthMaterial) Values() []string {
 	}
 	for _, c := range a.cookies {
 		out = append(out, c.Value)
+	}
+	if a.hasDB && a.dbPass != "" {
+		out = append(out, a.dbPass)
 	}
 	return out
 }
@@ -233,6 +293,9 @@ func (a *AuthMaterial) ValuesHash() string {
 	}
 	for _, c := range a.cookies {
 		pairs = append(pairs, "cookie:"+c.Name+"="+c.Value)
+	}
+	if a.hasDB {
+		pairs = append(pairs, "mysql:"+a.dbUser+"="+a.dbPass)
 	}
 	sort.Strings(pairs)
 	sum := sha256.Sum256([]byte(strings.Join(pairs, "\n")))
