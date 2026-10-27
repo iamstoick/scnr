@@ -11,9 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
-
 	"github.com/iamstoick/scnr/internal/safety"
 )
 
@@ -64,7 +61,7 @@ func (e *apiError) Error() string {
 
 // session holds one login: the credential, its source and a call budget.
 type session struct {
-	cred   azcore.TokenCredential
+	cred   tokenSource
 	source string
 	budget *budget
 	client *http.Client
@@ -72,11 +69,7 @@ type session struct {
 }
 
 func (s *session) token(ctx context.Context) (string, error) {
-	tk, err := s.cred.GetToken(ctx, policy.TokenRequestOptions{Scopes: []string{TokenScope}})
-	if err != nil {
-		return "", err
-	}
-	return tk.Token, nil
+	return s.cred.Token(ctx)
 }
 
 // armGet performs one authorised GET and decodes the JSON body into out.

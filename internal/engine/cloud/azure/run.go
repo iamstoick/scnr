@@ -7,8 +7,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-
 	"github.com/iamstoick/scnr/internal/domain"
 	"github.com/iamstoick/scnr/internal/engine"
 	"github.com/iamstoick/scnr/internal/safety"
@@ -83,12 +81,12 @@ func (e *Engine) Run(ctx context.Context, t domain.Target, o engine.Options, emi
 }
 
 // credKey separates sessions by login; tokens themselves are never keys.
-func credKey(cred azcore.TokenCredential, source string) string {
+func credKey(cred tokenSource, source string) string {
 	return fmt.Sprintf("%T/%s", cred, source)
 }
 
 // subscription names the subscription under test for evidence.
-func (e *Engine) newSession(cred azcore.TokenCredential, source string) *session {
+func (e *Engine) newSession(cred tokenSource, source string) *session {
 	base := "https://management.azure.com"
 	hosts := []string{}
 	if e.BaseEndpoint != "" {

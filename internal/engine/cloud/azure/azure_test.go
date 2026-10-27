@@ -10,9 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
-
 	"github.com/iamstoick/scnr/internal/config"
 	"github.com/iamstoick/scnr/internal/domain"
 	"github.com/iamstoick/scnr/internal/engine"
@@ -36,9 +33,7 @@ const testSub = "11111111-2222-3333-4444-555555555555"
 // bearer value.
 type staticToken struct{}
 
-func (staticToken) GetToken(context.Context, policy.TokenRequestOptions) (azcore.AccessToken, error) {
-	return azcore.AccessToken{Token: "test-token", ExpiresOn: time.Now().Add(time.Hour)}, nil
-}
+func (staticToken) Token(context.Context) (string, error) { return "test-token", nil }
 
 func testEngine(t *testing.T, srv *httptest.Server) *Engine {
 	t.Helper()
@@ -199,6 +194,38 @@ func TestAzureChecksAgainstMockARM(t *testing.T) {
 				t.Fatalf("thin evidence %+v", f)
 			}
 		}
+	}
+}
+
+func TestTokenClient(t *testing.T) {
+	var gotCT, gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotCT = r.Header.Get("Content-Type")
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.Write([]byte(`{"access_token":"tok123","expires_in":3600}`))
+	}))
+	defer srv.Close()
+	c := &clientSecretCredential{client: srv.Client(), tokenURL: srv.URL, clientID: "id", tenantID: "t", secret: "s3cret-value"}
+	tok, err := c.Token(context.Background())
+	if err != nil || tok != "tok123" {
+		t.Fatalf("token = %q %v", tok, err)
+	}
+	if gotCT != "application/x-www-form-urlencoded" || !strings.Contains(gotBody, "grant_type=client_credentials") {
+		t.Fatalf("bad token request: %q %q", gotCT, gotBody)
+	}
+	// Cached: a second call must not hit the network.
+	if _, err := c.Token(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	deny := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"error":"invalid_client"}`))
+	}))
+	defer deny.Close()
+	bad := &clientSecretCredential{client: deny.Client(), tokenURL: deny.URL, clientID: "id", tenantID: "t", secret: "s3cret-value"}
+	if _, err := bad.Token(context.Background()); err == nil || strings.Contains(err.Error(), "s3cret-value") {
+		t.Fatalf("secret must never appear: %v", err)
 	}
 }
 

@@ -13,8 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-
 	"github.com/iamstoick/scnr/internal/config"
 	"github.com/iamstoick/scnr/internal/domain"
 	"github.com/iamstoick/scnr/internal/engine"
@@ -47,7 +45,7 @@ type Engine struct {
 	Config config.CloudAzure
 	// testCred replaces the credential chain (tests only); the CLI never
 	// sets it.
-	testCred   azcore.TokenCredential
+	testCred   tokenSource
 	testSource string
 	// Test hooks: a base endpoint for every ARM call and the endpoint
 	// hosts to allow instead of management.azure.com (which also allows
