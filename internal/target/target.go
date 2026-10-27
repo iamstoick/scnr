@@ -233,8 +233,8 @@ func (d *Detector) normalise(ctx context.Context, raw string, typ domain.TargetT
 		}
 		t.Value = raw
 	case domain.TargetCloud:
-		if !strings.HasPrefix(raw, "aws://") {
-			return t, fmt.Errorf("only aws:// cloud targets are recognised (got %q)", raw)
+		if !strings.HasPrefix(raw, "aws://") && !strings.HasPrefix(raw, "azure://") {
+			return t, fmt.Errorf("only aws:// and azure:// cloud targets are recognised (got %q)", raw)
 		}
 		t.Value = raw
 	default:

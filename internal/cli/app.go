@@ -75,7 +75,10 @@ type App struct {
 	// AWSEndpoint points every AWS service client at a fake (tests only);
 	// no flag sets it (TestCLIDoesNotExposeEndpointOverride).
 	AWSEndpoint string
-	Verbose     bool
+	// AzureEndpoint points every Azure ARM call at a fake (tests only);
+	// no flag sets it (TestCLIDoesNotExposeEndpointOverride).
+	AzureEndpoint string
+	Verbose       bool
 
 	configErr  error      // set when scnr.yaml exists but is invalid
 	progressMu sync.Mutex // serialises engine progress lines from concurrent engines

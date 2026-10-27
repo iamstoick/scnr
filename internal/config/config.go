@@ -85,9 +85,14 @@ type CloudAWS struct {
 	InstanceCredentials bool `yaml:"instance_credentials,omitempty"`
 }
 
-// CloudAzure lists subscriptions for the prowler adapter.
+// CloudAzure lists subscriptions for Azure scans.
 type CloudAzure struct {
+	// Subscriptions are the ids a scan may run against without an
+	// interactive confirmation; required for --non-interactive.
 	Subscriptions []string `yaml:"subscriptions,omitempty"`
+	// ManagedIdentity allows VM managed identity login (IMDS, otherwise
+	// denied). Audited when used.
+	ManagedIdentity bool `yaml:"managed_identity,omitempty"`
 }
 
 // CloudGCP lists projects for the prowler adapter.

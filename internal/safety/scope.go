@@ -32,6 +32,9 @@ const (
 	CodeCloudAccountNotAllowed = "E_CLOUD_ACCOUNT_NOT_ALLOWED"
 	CodeCloudCredentialSource  = "E_CLOUD_CREDENTIAL_SOURCE"
 	CodeCloudIdentity          = "E_CLOUD_IDENTITY"
+	// First-party API transports (cloud SDKs) allow-list their hosts; a
+	// request anywhere else is a bug or a redirect escape.
+	CodeUpstreamHostNotAllowed = "E_UPSTREAM_HOST_NOT_ALLOWED"
 )
 
 // RefusalError is returned when the gate or a dial-time check refuses.

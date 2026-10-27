@@ -1,0 +1,99 @@
+---
+id: cloud.azure.storage.blob-public
+engine: cloud-azure
+title: Storage account allows anonymous blob access
+severity: high
+cwe: CWE-200
+what: A storage account has blob public access on, so containers can be world-readable.
+why: Public blobs leak data and enable takeover of dangling references; this is one of the most common cloud data exposures.
+fix: Set allowBlobPublicAccess to false on the storage account unless a container must be public, then scope it per container.
+safety: safe
+tags: [cloud, azure, storage]
+---
+id: cloud.azure.storage.public-network
+engine: cloud-azure
+title: Storage account reachable from the internet
+severity: medium
+cwe: CWE-200
+what: A storage account allows public network access at the firewall level.
+why: The data plane answers internet clients; combine with any auth gap and the data is exposed.
+fix: Set publicNetworkAccess to Disabled and use private endpoints, adding only the client ranges that need access.
+safety: safe
+tags: [cloud, azure, storage]
+---
+id: cloud.azure.storage.min-tls
+engine: cloud-azure
+title: Storage account allows legacy TLS
+severity: medium
+cwe: CWE-326
+what: A storage account negotiates TLS below 1.2.
+why: Old TLS versions have known weaknesses; clients can be downgraded.
+fix: Set minimumTlsVersion to TLS1_2 on the storage account.
+safety: safe
+tags: [cloud, azure, storage]
+---
+id: cloud.azure.keyvault.public-network
+engine: cloud-azure
+title: Key vault reachable from the internet
+severity: high
+cwe: CWE-200
+what: A key vault allows public network access; keys, secrets and certificates answer internet clients.
+why: The control plane of all your secrets should never face the internet.
+fix: Set publicNetworkAccess to Disabled and use private endpoints, adding only the client ranges that need access.
+safety: safe
+tags: [cloud, azure, keyvault]
+---
+id: cloud.azure.keyvault.no-purge-protection
+engine: cloud-azure
+title: Key vault without purge protection
+severity: medium
+cwe: CWE-200
+what: A key vault has purge protection off, so a deleted vault and everything in it can be purged immediately.
+why: Without a recovery window, one bad deletion (or one compromised admin) permanently destroys keys.
+fix: Enable purge protection on the vault (it cannot be turned off again afterwards).
+safety: safe
+tags: [cloud, azure, keyvault]
+---
+id: cloud.azure.nsg.open-rdp
+engine: cloud-azure
+title: NSG rule exposes RDP to the internet
+severity: high
+cwe: CWE-200
+what: A network security group allows inbound RDP (3389) from the internet.
+why: Internet-facing RDP is the first thing password-guessing botnets try.
+fix: Remove the internet source or scope it to the admin ranges that need it, preferably behind a VPN or bastion host.
+safety: safe
+tags: [cloud, azure, network]
+---
+id: cloud.azure.nsg.open-ssh
+engine: cloud-azure
+title: NSG rule exposes SSH to the internet
+severity: high
+cwe: CWE-200
+what: A network security group allows inbound SSH (22) from the internet.
+why: Internet-facing SSH draws constant brute-force attempts; any credential slip becomes a breach.
+fix: Remove the internet source or scope it to the admin ranges that need it, preferably behind a VPN or bastion host.
+safety: safe
+tags: [cloud, azure, network]
+---
+id: cloud.azure.sql.public-network
+engine: cloud-azure
+title: SQL server reachable from the internet
+severity: high
+cwe: CWE-200
+what: A SQL server allows public network access.
+why: Databases should never face the internet; exposed SQL invites brute force and unpatched RCE alike.
+fix: Set publicNetworkAccess to Disabled and use private endpoints, adding only the client ranges that need access.
+safety: safe
+tags: [cloud, azure, sql]
+---
+id: cloud.azure.inventory-truncated
+engine: cloud-azure
+title: Azure coverage truncated
+severity: info
+cwe: CWE-200
+what: An Azure check failed or the API budget ran out, so coverage is partial; findings here cannot vouch for the absence of the checked issues.
+why: Coverage gaps mean unexamined resources may still hold the issues above.
+fix: Re-run; if a check keeps failing, inspect the named check and the account's reader permissions.
+safety: safe
+tags: [cloud, azure]

@@ -44,6 +44,8 @@ func TestDetect(t *testing.T) {
 		{"https://Example.TEST/path?x=1#frag", domain.TargetURL, "https://example.test/path?x=1", true, "example.test", false},
 		{"http://intranet.test", domain.TargetURL, "http://intranet.test/", false, "intranet.test", false},
 		{"aws://prod", domain.TargetCloud, "aws://prod", false, "", false},
+		{"azure://my-sub", domain.TargetCloud, "azure://my-sub", false, "", false},
+		{"azure://11111111-2222-3333-4444-555555555555", domain.TargetCloud, "azure://11111111-2222-3333-4444-555555555555", false, "", false},
 		{filepath.Join(dir, "repo"), domain.TargetPath, filepath.Join(dir, "repo"), false, "", false},
 		{filepath.Join(dir, "file.txt"), domain.TargetPath, filepath.Join(dir, "file.txt"), false, "", false},
 		{"10.0.0.7", domain.TargetHost, "10.0.0.7", false, "10.0.0.7", false},

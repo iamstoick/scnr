@@ -27,6 +27,7 @@ import (
 	"github.com/iamstoick/scnr/internal/domain"
 	"github.com/iamstoick/scnr/internal/engine"
 	cloudaws "github.com/iamstoick/scnr/internal/engine/cloud/aws"
+	cloudazure "github.com/iamstoick/scnr/internal/engine/cloud/azure"
 	"github.com/iamstoick/scnr/internal/engine/codecheck"
 	"github.com/iamstoick/scnr/internal/engine/iac"
 	"github.com/iamstoick/scnr/internal/engine/image"
@@ -111,6 +112,7 @@ type engines struct {
 	reg *engine.Registry
 	ns  *netscan.Engine
 	aws *cloudaws.Engine
+	az  *cloudazure.Engine
 	// pluginEvents carries plugin integrity rows to the audit trail.
 	pluginEvents []plugin.LoadEvent
 }
@@ -163,11 +165,15 @@ func (a *App) engineRegistry() (*engines, error) {
 	if err != nil {
 		return nil, err
 	}
+	az, err := a.azureEngine()
+	if err != nil {
+		return nil, err
+	}
 	adapters, err := a.adapters()
 	if err != nil {
 		return nil, err
 	}
-	for _, e := range []engine.Engine{ns, sec, sc, ws, img, ia, cc, aws} {
+	for _, e := range []engine.Engine{ns, sec, sc, ws, img, ia, cc, aws, az} {
 		reg.Register(e)
 	}
 	for _, ad := range adapters {
@@ -181,7 +187,7 @@ func (a *App) engineRegistry() (*engines, error) {
 	for _, e := range pengines {
 		reg.Register(e)
 	}
-	return &engines{reg: reg, ns: ns, aws: aws, pluginEvents: pluginEvents}, nil
+	return &engines{reg: reg, ns: ns, aws: aws, az: az, pluginEvents: pluginEvents}, nil
 }
 
 // cloudConfig is cloud.aws from the scope file (empty before Open).
@@ -205,6 +211,27 @@ func (a *App) awsEngine() (*cloudaws.Engine, error) {
 			return nil, fmt.Errorf("AWSEndpoint %q: not a URL", a.AWSEndpoint)
 		}
 		e.BaseEndpoint, e.EndpointHosts = a.AWSEndpoint, []string{host}
+	}
+	return e, nil
+}
+
+// azureEngine builds the native Azure posture engine. The endpoint override
+// exists for tests only; it is never read from a flag or the config.
+func (a *App) azureEngine() (*cloudazure.Engine, error) {
+	cfg := config.CloudAzure{}
+	if a.Config != nil {
+		cfg = a.Config.Cloud.Azure
+	}
+	e, err := cloudazure.New(cfg)
+	if err != nil {
+		return nil, err
+	}
+	if a.AzureEndpoint != "" {
+		host := safety.URLHost(a.AzureEndpoint)
+		if host == "" {
+			return nil, fmt.Errorf("AzureEndpoint %q: not a URL", a.AzureEndpoint)
+		}
+		e.BaseEndpoint, e.EndpointHosts = a.AzureEndpoint, []string{host}
 	}
 	return e, nil
 }
@@ -382,6 +409,7 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 		Scope: scope, Acknowledged: acknowledged,
 		Resolver: a.Resolver, Verified: verifier.IsVerified, MaxHosts: req.MaxHosts,
 		CloudIdentity: engs.aws.Identity, CloudAccounts: cfg.Cloud.AWS.Accounts,
+		CloudIdentityAzure: engs.az.Identity, CloudAccountsAzure: cfg.Cloud.Azure.Subscriptions,
 	}
 	if interactive {
 		gate.Consent = a.consentPrompt

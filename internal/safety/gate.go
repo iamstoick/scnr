@@ -29,15 +29,16 @@ type VerifiedFunc func(ctx context.Context, host string) (bool, error)
 
 // CloudIdentityFunc confirms who the credentials are and returns the
 // account/subscription/project id. It performs exactly one identity call
-// (sts:GetCallerIdentity) and nothing else.
+// (sts:GetCallerIdentity on AWS, one subscription read on Azure) and
+// nothing else.
 type CloudIdentityFunc func(ctx context.Context, t domain.Target) (CloudIdentity, error)
 
 // CloudIdentity is the result of a cloud identity confirmation.
 type CloudIdentity struct {
-	Provider  string // "aws"
-	Account   string // 12-digit account id
-	Principal string // caller ARN
-	Source    string // "env" | "profile:<name>" | "web-identity" | "instance"
+	Provider  string // "aws" | "azure"
+	Account   string // 12-digit account id (AWS) or subscription UUID (Azure)
+	Principal string // caller ARN (AWS) or service principal / managed identity (Azure)
+	Source    string // "env" | "profile:<name>" | "web-identity" | "instance" | "managed-identity"
 }
 
 // Gate makes the per-target authorisation decision (Section 9).
@@ -54,6 +55,11 @@ type Gate struct {
 	// CloudAccounts is cloud.aws.accounts from the scope file: a confirmed
 	// account listed here is allowed without a prompt.
 	CloudAccounts []string
+	// CloudIdentityAzure and CloudAccountsAzure are the Azure equivalents
+	// (subscription UUIDs in cloud.azure.subscriptions); nil means
+	// azure:// targets are refused.
+	CloudIdentityAzure CloudIdentityFunc
+	CloudAccountsAzure []string
 }
 
 // CIDR caps (Section 9 step 6).
@@ -163,20 +169,26 @@ func (g *Gate) askConsent(ctx context.Context, d *Decision, plan, nonInteractive
 // belong to: one identity call, then the allowlist, then (interactively)
 // the user typing the account id back. The decision's Target is rewritten
 // to the confirmed account so the asset key, reports and every later API
-// client refer to it, and the profile moves to Labels["profile"].
+// client refer to it, and the profile moves to Labels["profile"]. Azure
+// works the same way with subscription UUIDs.
 func (g *Gate) decideCloud(ctx context.Context, d *Decision, plan string) (*Decision, error) {
 	t := d.Target
-	if g.CloudIdentity == nil {
+	az := strings.HasPrefix(t.Value, "azure://")
+	identity, allow, acctRe, noun, scopeKey := g.CloudIdentity, g.CloudAccounts, cloudAccountRe, "account", "accounts"
+	if az {
+		identity, allow, acctRe, noun, scopeKey = g.CloudIdentityAzure, g.CloudAccountsAzure, azureSubscriptionRe, "subscription", "subscriptions"
+	}
+	if identity == nil {
 		return nil, &RefusalError{Code: CodeCloudIdentity, Target: t.Raw, Reason: "no cloud identity confirmation available"}
 	}
-	id, err := g.CloudIdentity(ctx, t)
+	id, err := identity(ctx, t)
 	if err != nil {
 		if IsRefusal(err) {
 			return nil, err
 		}
 		return nil, &RefusalError{Code: CodeCloudIdentity, Target: t.Raw, Reason: "could not confirm the account behind these credentials: " + err.Error()}
 	}
-	if !cloudAccountRe.MatchString(id.Account) || id.Provider == "" {
+	if id.Provider == "" || !acctRe.MatchString(id.Account) {
 		return nil, &RefusalError{Code: CodeCloudIdentity, Target: t.Raw, Reason: "identity call returned no usable account id"}
 	}
 	d.Identity = &id
@@ -192,17 +204,20 @@ func (g *Gate) decideCloud(ctx context.Context, d *Decision, plan string) (*Deci
 	// user must type back.
 	t.Hostname = id.Account
 	d.Target = t
-	for _, a := range g.CloudAccounts {
+	for _, a := range allow {
 		if a == id.Account {
 			d.ConsentMethod = domain.ConsentCloudAllowlist
 			return d, nil
 		}
 	}
-	plan = fmt.Sprintf("You are about to scan %s account %s as %s (credentials from %s).\n%s", strings.ToUpper(id.Provider), id.Account, id.Principal, id.Source, plan)
-	return g.askConsent(ctx, d, plan, fmt.Sprintf("account %s is not in cloud.%s.accounts; add it to the scope file or confirm interactively", id.Account, id.Provider))
+	plan = fmt.Sprintf("You are about to scan %s %s %s as %s (credentials from %s).\n%s", strings.ToUpper(id.Provider), noun, id.Account, id.Principal, id.Source, plan)
+	return g.askConsent(ctx, d, plan, fmt.Sprintf("%s %s is not in cloud.%s.%s; add it to the scope file or confirm interactively", noun, id.Account, id.Provider, scopeKey))
 }
 
 var cloudAccountRe = regexp.MustCompile(`^[0-9]{12}$`)
+
+// azureSubscriptionRe matches a subscription UUID, any case.
+var azureSubscriptionRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 func (g *Gate) decideCIDR(ctx context.Context, d *Decision) (*Decision, error) {
 	t := d.Target

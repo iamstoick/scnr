@@ -251,6 +251,77 @@ type HTTPOptions struct {
 	Auth *AuthMaterial
 }
 
+// AllowlistedTransport returns a RoundTripper that refuses any host
+// outside hosts (exact, case-insensitive match), including redirect
+// targets resolved by http.Client. It is the narrow transport for
+// first-party API clients (cloud SDKs) whose endpoints cannot run on the
+// scope-checked dialer.
+func AllowlistedTransport(hosts []string) http.RoundTripper {
+	return &allowlistedTransport{rt: http.DefaultTransport, hosts: hosts}
+}
+
+type allowlistedTransport struct {
+	rt    http.RoundTripper
+	hosts []string
+}
+
+func (t *allowlistedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req == nil || req.URL == nil {
+		return nil, &RefusalError{Code: CodeUpstreamHostNotAllowed, Target: "?", Reason: "no request URL"}
+	}
+	host := strings.ToLower(req.URL.Hostname())
+	for _, h := range t.hosts {
+		if host == strings.ToLower(h) {
+			return t.rt.RoundTrip(req)
+		}
+	}
+	return nil, &RefusalError{Code: CodeUpstreamHostNotAllowed, Target: req.URL.Host, Reason: "host not in the API allowlist"}
+}
+
+// NewAllowlistedClient returns a client that only talks to hosts: every
+// other host, including redirect targets, is refused before any dial. It
+// is the narrow client for first-party API endpoints (cloud SDKs) that
+// cannot run on the scope-checked dialer.
+func NewAllowlistedClient(hosts []string, timeout time.Duration, ua string) *http.Client {
+	if timeout <= 0 {
+		timeout = 60 * time.Second
+	}
+	if ua == "" {
+		ua = "scnr"
+	}
+	inner := &http.Transport{
+		TLSClientConfig:        nil, // default verification stays on
+		TLSHandshakeTimeout:    10 * time.Second,
+		ResponseHeaderTimeout:  timeout,
+		DisableKeepAlives:      true,
+		MaxResponseHeaderBytes: 64 << 10,
+		Proxy:                  nil, // API traffic never uses HTTP_PROXY
+	}
+	return &http.Client{
+		Timeout:   timeout,
+		Transport: &userAgentTransport{rt: &allowlistedTransport{rt: inner, hosts: hosts}, ua: ua},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= MaxRedirects {
+				return fmt.Errorf("stopped after %d redirects", MaxRedirects)
+			}
+			return nil
+		},
+	}
+}
+
+type userAgentTransport struct {
+	rt http.RoundTripper
+	ua string
+}
+
+func (t *userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req != nil && req.Header.Get("User-Agent") == "" {
+		req = req.Clone(req.Context())
+		req.Header.Set("User-Agent", t.ua)
+	}
+	return t.rt.RoundTrip(req)
+}
+
 // NewHTTPClient returns a client whose every connection (including each
 // redirect hop) passes the scope check, with per-host HTTP rate limiting.
 // TLS verification stays on: the client is used to observe targets, and

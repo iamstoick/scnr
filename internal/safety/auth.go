@@ -38,14 +38,14 @@ type AuthMaterial struct {
 // keep the session cookies on success. The URL must share the scan
 // target's origin; the attempt runs once, never retried, never guessed.
 type LoginSpec struct {
-	URL          string
-	UserField    string
-	User         string
-	PassField    string
-	Pass         string
-	Extra        map[string]string
-	Success      string
-	Origin       string
+	URL       string
+	UserField string
+	User      string
+	PassField string
+	Pass      string
+	Extra     map[string]string
+	Success   string
+	Origin    string
 }
 
 // MaxAuthFileBytes caps --auth-file at 64 KiB.

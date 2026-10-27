@@ -843,7 +843,7 @@ func (e *Engine) offersCipher(ctx context.Context, dialer *safety.Dialer, loc, s
 	if err != nil {
 		return false, "", refusalOnly(err)
 	}
-	defer raw.Close() //nolint:errcheck // cipher probe; boolean already decided
+	defer raw.Close()   //nolint:errcheck // cipher probe; boolean already decided
 	cfg := &tls.Config{ //nolint:gosec // handshake-only cipher probe
 		InsecureSkipVerify: true,
 		ServerName:         serverName,

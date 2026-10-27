@@ -757,3 +757,16 @@ func TestHosts(t *testing.T) {
 }
 
 func itoa(i int) string { return strconv.Itoa(i) }
+
+func TestAllowlistedTransport(t *testing.T) {
+	g := AllowlistedTransport([]string{"management.azure.com"})
+	// Refusal happens before any dial: no network is touched.
+	evil, _ := http.NewRequest(http.MethodGet, "https://evil.example/x", nil)
+	if _, err := g.RoundTrip(evil); err == nil {
+		t.Fatal("off-allowlist host must refuse")
+	} else if !IsRefusal(err) {
+		t.Fatalf("want refusal, got %v", err)
+	} else if !strings.Contains(err.Error(), "E_UPSTREAM_HOST_NOT_ALLOWED") {
+		t.Fatalf("want allowlist code, got %v", err)
+	}
+}
