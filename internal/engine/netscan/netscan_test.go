@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -183,6 +184,115 @@ func TestTLSLegacyAndExpired(t *testing.T) {
 	legacy := out["net.tls.legacy-version"]
 	if len(legacy) != 1 || legacy[0].Title != "Legacy TLS version accepted (TLS 1.0)" {
 		t.Errorf("want one TLS 1.0 legacy finding, got %+v", legacy)
+	}
+}
+
+func startTLSWithCiphers(t *testing.T, ciphers []uint16) int {
+	t.Helper()
+	cert := selfSignedCert(t, time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
+	ln, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12,
+		MaxVersion:   tls.VersionTLS12,
+		CipherSuites: ciphers,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ln.Close() })
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				c.SetDeadline(time.Now().Add(2 * time.Second))
+				if tc, ok := c.(*tls.Conn); ok {
+					tc.Handshake()
+				}
+				c.Close()
+			}(c)
+		}
+	}()
+	return portOf(ln.Addr().String())
+}
+
+func strongCipher(t *testing.T) (uint16, string) {
+	t.Helper()
+	insecure := map[uint16]bool{}
+	for _, s := range tls.InsecureCipherSuites() {
+		insecure[s.ID] = true
+	}
+	for _, want := range []string{"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256", "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"} {
+		for _, s := range tls.CipherSuites() {
+			if s.Name == want {
+				return s.ID, s.Name
+			}
+		}
+	}
+	for _, s := range tls.CipherSuites() {
+		if s.ID == 0x1301 || s.ID == 0x1302 || s.ID == 0x1303 {
+			continue
+		}
+		if strings.Contains(s.Name, "ECDSA") {
+			continue
+		}
+		if !insecure[s.ID] && !isWeakCipher(s.ID, s.Name, insecure) {
+			return s.ID, s.Name
+		}
+	}
+	t.Fatal("no strong RSA cipher in tls.CipherSuites")
+	return 0, ""
+}
+
+func TestTLSCipherInventoryAndWeak(t *testing.T) {
+	insecure := tls.InsecureCipherSuites()
+	if len(insecure) == 0 {
+		t.Skip("no insecure cipher suites in this toolchain")
+	}
+	weakID, weakName := insecure[0].ID, insecure[0].Name
+	strongID, strongName := strongCipher(t)
+
+	// Strong-only server: inventory without weak.
+	port := startTLSWithCiphers(t, []uint16{strongID})
+	tlsPorts[port] = true
+	defer delete(tlsPorts, port)
+	e, _ := New()
+	tgt := domain.Target{Type: domain.TargetHost, Value: "127.0.0.1", Hostname: "127.0.0.1"}
+	o := testOptions(t, []int{port})
+	o.HTTP = nil
+	out := collect(t, e, tgt, o)
+	inv := out["net.tls.cipher-inventory"]
+	if len(inv) != 1 {
+		t.Fatalf("want cipher inventory, got %v", out)
+	}
+	found := false
+	for _, ev := range inv[0].Evidence {
+		if ev.Kind == "ciphers" && strings.Contains(ev.Redacted, strongName) {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("inventory missing %s: %+v", strongName, inv[0].Evidence)
+	}
+	if len(out["net.tls.weak-cipher"]) != 0 {
+		t.Errorf("strong-only server flagged weak: %v", out["net.tls.weak-cipher"])
+	}
+
+	// Weak server: inventory plus one weak finding naming the cipher.
+	weakPort := startTLSWithCiphers(t, []uint16{weakID})
+	tlsPorts[weakPort] = true
+	defer delete(tlsPorts, weakPort)
+	o2 := testOptions(t, []int{weakPort})
+	o2.HTTP = nil
+	out2 := collect(t, e, tgt, o2)
+	if len(out2["net.tls.cipher-inventory"]) != 1 {
+		t.Fatalf("want cipher inventory for weak server, got %v", out2)
+	}
+	wf := out2["net.tls.weak-cipher"]
+	if len(wf) != 1 || !strings.Contains(wf[0].Title, weakName) {
+		t.Fatalf("want weak-cipher naming %s, got %+v", weakName, wf)
 	}
 }
 
@@ -380,24 +490,25 @@ func TestTLSProbesUseSafeDialer(t *testing.T) {
 
 // Finding 2 (rate limiting): every TLS probe connection counts against the
 // connection limiter. One TLS port costs 1 connect + 1 handshake + 2 legacy
-// version probes = 4 tokens; at 2 conn/s with burst 2 that is >= ~1s.
+// version probes + per-cipher probes.
 func TestTLSProbesCountAgainstConnLimiter(t *testing.T) {
 	port, conns := countingTLSListener(t)
 	tlsPorts[port] = true
 	defer delete(tlsPorts, port)
 	o := testOptions(t, []int{port})
 	o.HTTP = nil
-	limits, _, _ := safety.NewLimits(false, safety.LimitRequest{RatePerSec: 2})
+	limits, _, _ := safety.NewLimits(false, safety.LimitRequest{RatePerSec: 20})
 	o.Limiter = limits
 	o.Dialer = &safety.Dialer{Scope: o.Scope, Limits: limits}
 	e, _ := New()
+	want := int32(4 + len(cipherCandidates()))
 	start := time.Now()
 	collect(t, e, domain.Target{Type: domain.TargetHost, Value: "127.0.0.1", Hostname: "127.0.0.1"}, o)
-	if got := atomic.LoadInt32(conns); got != 4 {
-		t.Fatalf("expected 4 connections (connect + handshake + 2 version probes), got %d", got)
+	if got := atomic.LoadInt32(conns); got != want {
+		t.Fatalf("expected %d connections (connect + handshake + 2 version + %d cipher probes), got %d", want, len(cipherCandidates()), got)
 	}
 	if el := time.Since(start); el < 600*time.Millisecond {
-		t.Fatalf("4 connections at 2 conn/s finished in %v; TLS probes bypassed the limiter", el)
+		t.Fatalf("%d connections at 20 conn/s finished in %v; TLS probes bypassed the limiter", want, el)
 	}
 }
 

@@ -1,5 +1,5 @@
 // Package netscan is the native TCP connect scanner: open ports, banners,
-// TLS certificate/version checks and a single HTTP GET for service labels.
+// TLS certificate/version/cipher checks and a single HTTP GET for service labels.
 // No raw sockets, no root, no retries.
 package netscan
 
@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/netip"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -459,11 +460,37 @@ func (e *Engine) checkTLS(ctx context.Context, dialer *safety.Dialer, host strin
 	tc := tls.Client(raw, cfg)
 	_ = tc.SetDeadline(time.Now().Add(connectTimeout * 2))
 	if err := tc.HandshakeContext(ctx); err != nil {
-		raw.Close() //nolint:errcheck // failed handshake; nothing to report
-		return nil, nil, nil
+		raw.Close() //nolint:errcheck // first handshake failed; retry offering insecure ciphers for weak-only servers
+		raw2, err := dialer.DialContext(ctx, "tcp", loc)
+		if err != nil {
+			return nil, nil, refusalOnly(err)
+		}
+		ids := make([]uint16, 0, len(cipherCandidates()))
+		for _, suite := range cipherCandidates() {
+			ids = append(ids, suite.ID)
+		}
+		cfg2 := &tls.Config{InsecureSkipVerify: true, ServerName: serverName, MinVersion: tls.VersionTLS10, MaxVersion: tls.VersionTLS12, CipherSuites: ids} //nolint:gosec // weak-only fallback
+		tc2 := tls.Client(raw2, cfg2)
+		_ = tc2.SetDeadline(time.Now().Add(connectTimeout * 2))
+		if err := tc2.HandshakeContext(ctx); err != nil {
+			raw2.Close() //nolint:errcheck // not TLS or no shared cipher; nothing to report
+			return nil, nil, nil
+		}
+		state := tc2.ConnectionState()
+		tc2.Close() //nolint:errcheck // state already captured
+		if len(state.PeerCertificates) == 0 {
+			return nil, nil, nil
+		}
+		return e.finishTLS(ctx, dialer, host, assetKey, loc, serverName, state)
 	}
 	state := tc.ConnectionState()
 	tc.Close() //nolint:errcheck // state already captured
+	return e.finishTLS(ctx, dialer, host, assetKey, loc, serverName, state)
+}
+
+// finishTLS evaluates the negotiated connection: certificate findings,
+// legacy version probes, and cipher enumeration.
+func (e *Engine) finishTLS(ctx context.Context, dialer *safety.Dialer, host, assetKey, loc, serverName string, state tls.ConnectionState) ([]domain.Evidence, []domain.Finding, error) {
 	if len(state.PeerCertificates) == 0 {
 		return nil, nil, nil
 	}
@@ -513,6 +540,23 @@ func (e *Engine) checkTLS(ctx context.Context, dialer *safety.Dialer, host strin
 			findings = append(findings, f)
 		}
 	}
+	accepted, weak, cipherEv, err := e.enumerateCiphers(ctx, dialer, loc, serverName, state.Version, state.CipherSuite)
+	if err != nil {
+		return nil, nil, err
+	}
+	if cipherEv != nil {
+		evidence = append(evidence, *cipherEv)
+		inv := e.rules.NewFinding("net.tls.cipher-inventory", assetKey, loc, domain.Confirmed)
+		inv.Title = fmt.Sprintf("TLS cipher suites accepted (%d)", len(accepted))
+		inv.Evidence = evidence
+		findings = append(findings, inv)
+		if len(weak) > 0 {
+			wf := e.rules.NewFinding("net.tls.weak-cipher", assetKey, loc, domain.Confirmed)
+			wf.Title = fmt.Sprintf("Weak TLS cipher accepted (%s)", strings.Join(weak, ", "))
+			wf.Evidence = evidence
+			findings = append(findings, wf)
+		}
+	}
 	return evidence, findings, nil
 }
 
@@ -526,6 +570,121 @@ func (e *Engine) offersVersion(ctx context.Context, dialer *safety.Dialer, loc, 
 	tc := tls.Client(raw, cfg)
 	_ = tc.SetDeadline(time.Now().Add(connectTimeout * 2))
 	return tc.HandshakeContext(ctx) == nil, nil
+}
+
+// cipherCandidates lists every TLS 1.0-1.2 cipher the client can offer,
+// deduplicated by ID. TLS 1.3 suites (0x1301-0x1303) are not configurable
+// in crypto/tls and are reported from the initial handshake instead.
+func cipherCandidates() []*tls.CipherSuite {
+	seen := map[uint16]bool{}
+	var out []*tls.CipherSuite
+	for _, suite := range append(append([]*tls.CipherSuite{}, tls.CipherSuites()...), tls.InsecureCipherSuites()...) {
+		if suite.ID == 0x1301 || suite.ID == 0x1302 || suite.ID == 0x1303 {
+			continue
+		}
+		if seen[suite.ID] {
+			continue
+		}
+		seen[suite.ID] = true
+		out = append(out, suite)
+	}
+	return out
+}
+
+// insecureCipherIDs marks the cipher IDs Go considers insecure by default.
+func insecureCipherIDs() map[uint16]bool {
+	m := map[uint16]bool{}
+	for _, suite := range tls.InsecureCipherSuites() {
+		m[suite.ID] = true
+	}
+	return m
+}
+
+// isWeakCipher reports ciphers with broken or deprecated primitives.
+func isWeakCipher(id uint16, name string, insecure map[uint16]bool) bool {
+	if insecure[id] {
+		return true
+	}
+	upper := strings.ToUpper(name)
+	for _, weak := range []string{"RC4", "DES", "NULL", "EXPORT", "ANON", "_MD5"} {
+		if strings.Contains(upper, weak) {
+			return true
+		}
+	}
+	return false
+}
+
+// offersCipher probes one cipher suite within TLS 1.0-1.2. It returns the
+// accepted flag and the negotiated version name.
+func (e *Engine) offersCipher(ctx context.Context, dialer *safety.Dialer, loc, serverName string, id uint16) (bool, string, error) {
+	raw, err := dialer.DialContext(ctx, "tcp", loc)
+	if err != nil {
+		return false, "", refusalOnly(err)
+	}
+	defer raw.Close() //nolint:errcheck // cipher probe; boolean already decided
+	cfg := &tls.Config{ //nolint:gosec // handshake-only cipher probe
+		InsecureSkipVerify: true,
+		ServerName:         serverName,
+		MinVersion:         tls.VersionTLS10,
+		MaxVersion:         tls.VersionTLS12,
+		CipherSuites:       []uint16{id},
+	}
+	tc := tls.Client(raw, cfg)
+	_ = tc.SetDeadline(time.Now().Add(connectTimeout * 2))
+	if err := tc.HandshakeContext(ctx); err != nil {
+		return false, "", nil
+	}
+	return true, tls.VersionName(tc.ConnectionState().Version), nil
+}
+
+// enumerateCiphers probes every candidate cipher and returns the accepted
+// names, the weak subset, and inventory evidence. The initial handshake's
+// cipher is always included so TLS 1.3-only servers still report one suite.
+func (e *Engine) enumerateCiphers(ctx context.Context, dialer *safety.Dialer, loc, serverName string, initialVersion uint16, initialCipher uint16) ([]string, []string, *domain.Evidence, error) {
+	candidates := cipherCandidates()
+	byName := make(map[string]uint16, len(candidates))
+	for _, suite := range candidates {
+		byName[suite.Name] = suite.ID
+	}
+	insecure := insecureCipherIDs()
+	acceptedByName := map[string]string{}
+	for _, suite := range candidates {
+		if ctx.Err() != nil {
+			return nil, nil, nil, ctx.Err()
+		}
+		ok, version, err := e.offersCipher(ctx, dialer, loc, serverName, suite.ID)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		if ok {
+			acceptedByName[suite.Name] = version
+		}
+	}
+	if name := tls.CipherSuiteName(initialCipher); name != "" {
+		if _, ok := acceptedByName[name]; !ok {
+			acceptedByName[name] = tls.VersionName(initialVersion)
+		}
+	}
+	if len(acceptedByName) == 0 {
+		return nil, nil, nil, nil
+	}
+	names := make([]string, 0, len(acceptedByName))
+	for name := range acceptedByName {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	withVersions := make([]string, 0, len(names))
+	var weak []string
+	for _, name := range names {
+		withVersions = append(withVersions, name+" ("+acceptedByName[name]+")")
+		if isWeakCipher(byName[name], name, insecure) {
+			weak = append(weak, name)
+		}
+	}
+	sort.Strings(weak)
+	summary := "accepted=" + strings.Join(withVersions, ", ")
+	ev := &domain.Evidence{Kind: "ciphers", Location: loc, Redacted: summary, Hash: domain.SHA256Hex(strings.Join(names, ","))}
+	return names, weak, ev, nil
 }
 
 // refusalOnly keeps safety refusals (scope, pin, deny, limiter) and drops
