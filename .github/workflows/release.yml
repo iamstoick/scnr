@@ -1,5 +1,7 @@
-# scnr release: tag v* with `git tag v0.1.0 && git push origin v0.1.0`
+# scnr release: tag v* with `git tag v0.3.0 && git push origin v0.3.0`
 # to publish stripped static binaries for both supported platforms.
+# B11 budget is 80 MiB: native SPA rendering (chromedp) and the Azure
+# engine landed in v0.3.0 and cost ~2 MiB over the old 72 MiB cap.
 name: release
 
 on:
@@ -28,7 +30,7 @@ jobs:
           for b in dist/scnr-*; do
             bytes=$(wc -c < "$b")
             echo "$b: $bytes bytes"
-            test "$bytes" -le 75497472 || { echo "B11 budget blown: $b exceeds 72 MiB"; exit 1; }
+            test "$bytes" -le 83886080 || { echo "B11 budget blown: $b exceeds 80 MiB"; exit 1; }
           done
           (cd dist && sha256sum scnr-* > checksums.txt && cat checksums.txt)
       - name: publish GitHub release
