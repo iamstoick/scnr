@@ -90,6 +90,7 @@ func scanFlags(f *pflag.FlagSet, req *wizard.ScanRequest, engines, skip *string,
 	f.BoolVar(&req.Offline, "offline", false, "do not contact osv.dev; SCA uses the loaded offline bundle (scnr db update --offline-bundle) or is skipped")
 	f.IntVar(&req.MaxHosts, "max-hosts", 0, "raise the CIDR host cap to N (audited)")
 	f.StringVar(&req.Ports, "ports", "", "top100|top1000|all|LIST (e.g. 22,80,8000-8100)")
+	f.StringVar(&req.UDPPorts, "udp-ports", "", "top|off|LIST (e.g. 53,123,161; default top UDP ports)")
 	f.IntVar(&req.Rate, "rate", 0, "connection attempts per second (lowering is always allowed)")
 	f.IntVar(&req.Concurrency, "concurrency", 0, "per-host concurrency")
 	f.BoolVar(&req.Strict, "strict", false, "exit 5 when any engine is skipped or fails")
@@ -100,7 +101,7 @@ func scanFlags(f *pflag.FlagSet, req *wizard.ScanRequest, engines, skip *string,
 	f.StringVar(&req.Diff, "diff", "", "print new/fixed findings vs a previous scan: latest|SCAN-ID")
 	f.StringVar(&req.Templates, "templates", "", "directory of extra webscan templates (validated, safe only)")
 	f.BoolVar(&req.AllowIntrusive, "allow-intrusive", false, "run active checks (crawler + inert-marker probes) where the intrusive gate allows")
-	f.StringVar(&req.AuthFile, "auth-file", "", "YAML file with authenticated-scan headers/cookies/mysql login (mode 0600, owned by you)")
+	f.StringVar(&req.AuthFile, "auth-file", "", "YAML file with authenticated-scan headers/cookies/mysql login/form login (mode 0600, owned by you)")
 	f.StringArrayVar(&req.Headers, "header", nil, "extra request header as \"Name: value\" (repeatable; interactive use only, never scheduled)")
 	f.StringArrayVar(&req.Cookies, "cookie", nil, "extra request cookie as \"name=value\" (repeatable; interactive use only, never scheduled)")
 }
@@ -278,6 +279,10 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 	if err != nil {
 		return nil, ExitUsage, err
 	}
+	udpPorts, err := engs.ns.ParseUDPPorts(req.UDPPorts)
+	if err != nil {
+		return nil, ExitUsage, err
+	}
 	if _, err := report.ParseFormats(req.Formats, report.Registry(report.Meta{})); err != nil {
 		return nil, ExitUsage, err
 	}
@@ -387,7 +392,7 @@ func (a *App) RunScan(ctx context.Context, req wizard.ScanRequest) (*domain.Scan
 	if cfg.Online != nil && !*cfg.Online {
 		online = false
 	}
-	opts := engine.Options{Profile: profile, Limiter: limits, HTTP: httpClient, Scope: scope, Dialer: dialer, Log: a.Log, Online: online, Ports: ports, Redactor: a.Redactor, SecretKey: secretKey, TemplatesDir: req.Templates, NucleiTemplatesDir: cfg.Tools.NucleiTemplates, SemgrepRules: cfg.Tools.SemgrepRules, Intrusive: req.AllowIntrusive, Auth: auth}
+	opts := engine.Options{Profile: profile, Limiter: limits, HTTP: httpClient, Scope: scope, Dialer: dialer, Log: a.Log, Online: online, Ports: ports, UDPPorts: udpPorts, Redactor: a.Redactor, SecretKey: secretKey, TemplatesDir: req.Templates, NucleiTemplatesDir: cfg.Tools.NucleiTemplates, SemgrepRules: cfg.Tools.SemgrepRules, Intrusive: req.AllowIntrusive, Auth: auth}
 	ig := &safety.IntrusiveGate{Scope: scope, Verified: verifier.IsVerified}
 
 	type planned struct {

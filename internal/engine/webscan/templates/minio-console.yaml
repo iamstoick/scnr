@@ -1,0 +1,18 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "minio-console"
+info:
+  title: "MinIO health endpoint reachable"
+  severity: "info"
+  cwe: "CWE-200"
+  what: "A MinIO object storage server answers health checks at /minio/health/live."
+  why: "This is informational: a reachable storage service tells an attacker where buckets and credentials live."
+  fix: "Restrict the console and API to clients that need them and keep MinIO updated."
+  tags: ["service"]
+safety: safe
+http:
+  - method: GET
+    path: ["/minio/health/live"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]

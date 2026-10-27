@@ -622,7 +622,7 @@ func TestNetscanPlanDisclosesMySQL(t *testing.T) {
 	if !strings.Contains(plan.Summary, "CVE-2012-2122") {
 		t.Fatalf("plan hides CVE probe: %q", plan.Summary)
 	}
-	if plan.EstRequests != 1+mysqlCVEAttempts {
+	if plan.EstRequests != 1+len(topUDPPorts)+mysqlCVEAttempts {
 		t.Fatalf("EstRequests=%d", plan.EstRequests)
 	}
 	if strings.Contains(plan.Summary, "pw") {

@@ -107,7 +107,7 @@ func TestScanLocalListeners(t *testing.T) {
 	tgt := domain.Target{Raw: "127.0.0.1", Type: domain.TargetHost, Value: "127.0.0.1", Hostname: "127.0.0.1"}
 	o := testOptions(t, ports)
 	plan, err := e.Plan(context.Background(), tgt, o)
-	if err != nil || plan.EstRequests != len(ports) || !plan.Network {
+	if err != nil || plan.EstRequests != len(ports)+len(topUDPPorts) || !plan.Network {
 		t.Fatalf("plan: %+v %v", plan, err)
 	}
 	out := collect(t, e, tgt, o)
@@ -351,6 +351,73 @@ func TestAdminAndDBPortSeverity(t *testing.T) {
 	out = collect(t, e, tgt, o)
 	if f := out["net.exposed-db-port"]; f[0].Severity != domain.High {
 		t.Fatalf("public db port should be high: %+v", f)
+	}
+}
+
+func TestParseUDPPorts(t *testing.T) {
+	e, _ := New()
+	if p, err := e.ParseUDPPorts(""); err != nil || p != nil {
+		t.Fatalf("empty means default (nil): %v %v", p, err)
+	}
+	if p, err := e.ParseUDPPorts("off"); err != nil || p == nil || len(p) != 0 {
+		t.Fatalf("off means explicit empty: %v %v", p, err)
+	}
+	if p, err := e.ParseUDPPorts("top"); err != nil || len(p) != len(topUDPPorts) {
+		t.Fatalf("top: %v %v", p, err)
+	}
+	if p, err := e.ParseUDPPorts("53,123,160-162"); err != nil || len(p) != 5 {
+		t.Fatalf("list: %v %v", p, err)
+	}
+	for _, bad := range []string{"0", "70000", "80-22", "x"} {
+		if _, err := e.ParseUDPPorts(bad); err == nil {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+	if got := e.UDPPorts(engine.Options{}); len(got) != len(topUDPPorts) {
+		t.Fatal("nil UDPPorts means default top list")
+	}
+	if got := e.UDPPorts(engine.Options{UDPPorts: []int{}}); len(got) != 0 {
+		t.Fatal("explicit empty disables UDP probing")
+	}
+}
+
+// A UDP listener that answers every datagram is reported; a silent port
+// yields nothing (unknown, never closed).
+func TestUDPResponsiveAndSilent(t *testing.T) {
+	echo, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer echo.Close()
+	go func() {
+		buf := make([]byte, 1500)
+		for {
+			n, addr, err := echo.ReadFrom(buf)
+			if err != nil {
+				return
+			}
+			echo.WriteTo(buf[:n], addr)
+		}
+	}()
+	_, echoPortStr, _ := net.SplitHostPort(echo.LocalAddr().String())
+	echoPort, _ := strconv.Atoi(echoPortStr)
+	closed, _ := net.ListenPacket("udp", "127.0.0.1:0")
+	_, closedPortStr, _ := net.SplitHostPort(closed.LocalAddr().String())
+	closedPort, _ := strconv.Atoi(closedPortStr)
+	closed.Close()
+
+	e, _ := New()
+	tgt := domain.Target{Type: domain.TargetHost, Value: "127.0.0.1", Hostname: "127.0.0.1"}
+	o := testOptions(t, []int{1})
+	o.UDPPorts = []int{echoPort, closedPort}
+	o.HTTP = nil
+	out := collect(t, e, tgt, o)
+	udp := out["net.open-udp-port"]
+	if len(udp) != 1 {
+		t.Fatalf("want one UDP finding, got %v", out)
+	}
+	if !strings.HasSuffix(udp[0].Location, "/udp") || len(udp[0].Evidence) != 1 || udp[0].Evidence[0].Kind != "response" {
+		t.Errorf("udp finding %+v", udp[0])
 	}
 }
 

@@ -9,6 +9,17 @@ fix: If this service is not needed, stop it or block the port with a firewall. I
 safety: safe
 tags: [network, inventory]
 ---
+id: net.open-udp-port
+engine: netscan
+title: Open UDP port
+severity: info
+cwe: CWE-200
+what: A UDP service on this host answered a probe datagram, meaning a service is listening there.
+why: "Exposed UDP services (DNS resolvers, NTP, SNMP, memcached) are abused for amplification attacks and leak infrastructure details. Silence means unknown, never closed: without raw sockets there is no ICMP unreachable to tell open from filtered."
+fix: If this service is not needed, stop it or block the port with a firewall. If it is needed, restrict it to the clients that need it (DNS and NTP especially must never be open resolvers for the internet).
+safety: safe
+tags: [network, inventory]
+---
 id: net.exposed-admin-port
 engine: netscan
 title: Remote administration service exposed

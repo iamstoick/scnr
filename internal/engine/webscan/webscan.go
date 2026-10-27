@@ -145,6 +145,9 @@ func (e *Engine) Plan(_ context.Context, t domain.Target, o engine.Options) (eng
 	if o.Auth != nil && o.Auth.HeaderCount()+o.Auth.CookieCount() > 0 {
 		summary += fmt.Sprintf("; authenticated: yes (%d headers, %d cookies)", o.Auth.HeaderCount(), o.Auth.CookieCount())
 	}
+	if o.Auth != nil && o.Auth.HasLogin() {
+		summary += fmt.Sprintf("; login as %q (single attempt, origin must match)", o.Auth.LoginUser())
+	}
 	rps := 10
 	if o.Limiter != nil && o.Limiter.HTTPRPSPerHost > 0 {
 		rps = o.Limiter.HTTPRPSPerHost
@@ -193,8 +196,16 @@ func (e *Engine) Run(ctx context.Context, t domain.Target, o engine.Options, emi
 	}
 	redirects := &redirectTracker{seen: map[string]bool{}}
 
+	// Form login (if configured) runs once, before anything else, so the
+	// passive checks, templates and crawler all ride the session.
+	client := o.HTTP
+	var sessNames []string
+	if o.Auth != nil && o.Auth.HasLogin() {
+		client, sessNames = e.loginSession(ctx, o, base, assetKey, red, safeEmit)
+	}
+
 	// Passive checks on the target itself.
-	resp, err := e.fetch(ctx, o.HTTP, http.MethodGet, t.Value, map[string]string{"Origin": canaryOrigin})
+	resp, err := e.fetch(ctx, client, http.MethodGet, t.Value, map[string]string{"Origin": canaryOrigin})
 	if err != nil {
 		if r, ok := safety.AsRedirectOutOfScope(err); ok {
 			if err := redirects.emit(e, r, assetKey, red, safeEmit); err != nil {
@@ -250,7 +261,7 @@ func (e *Engine) Run(ctx context.Context, t domain.Target, o engine.Options, emi
 				go func(tpl *Template, step *Step, p, target string) {
 					defer wg.Done()
 					defer sem.Release(1)
-					if err := e.runStep(ctx, o.HTTP, tpl, step, p, target, assetKey, red, redirects, okPaths, safeEmit); err != nil {
+					if err := e.runStep(ctx, client, tpl, step, p, target, assetKey, red, redirects, okPaths, safeEmit); err != nil {
 						setErr(err)
 					}
 				}(tpl, step, p, target)
@@ -267,7 +278,7 @@ func (e *Engine) Run(ctx context.Context, t domain.Target, o engine.Options, emi
 	var stats engine.Stats
 	if o.Intrusive {
 		var err error
-		stats, err = e.runIntrusive(ctx, t, base, o, assetKey, red, okPaths.list(), safeEmit)
+		stats, err = e.runIntrusive(ctx, t, base, o, client, assetKey, red, okPaths.list(), sessNames, safeEmit)
 		if err != nil {
 			if o.Stats != nil {
 				o.Stats(stats)
@@ -310,11 +321,11 @@ func (s *urlSet) list() []string {
 // runIntrusive crawls from the target and probes the discovered
 // parameters with inert markers. It returns the request telemetry with
 // any error, so partial counts still reach the scan record.
-func (e *Engine) runIntrusive(ctx context.Context, t domain.Target, base *url.URL, o engine.Options, assetKey string, red *safety.Redactor, seeds []string, emit engine.EmitFunc) (engine.Stats, error) {
+func (e *Engine) runIntrusive(ctx context.Context, t domain.Target, base *url.URL, o engine.Options, client *http.Client, assetKey string, red *safety.Redactor, seeds []string, sessNames []string, emit engine.EmitFunc) (engine.Stats, error) {
 	var stats engine.Stats
 	deep := o.Profile.Name == "deep"
 	crawler := &Crawler{
-		Client: o.HTTP, Scope: urlScopeFilter(base, o),
+		Client: client, Scope: urlScopeFilter(base, o),
 		Limits: DefaultCrawlLimits(deep), Origin: base, Seeds: seeds, Log: o.Log,
 	}
 	var pages []Page
@@ -354,10 +365,8 @@ func (e *Engine) runIntrusive(ctx context.Context, t domain.Target, base *url.UR
 			return stats, err
 		}
 	}
-	prober := &Prober{Client: o.HTTP, Budget: probeBudget(deep), Rules: e.rules, Red: red, AssetKey: assetKey}
-	if o.Auth != nil {
-		prober.SessionCookies = o.Auth.CookieNames()
-	}
+	prober := &Prober{Client: client, Budget: probeBudget(deep), Rules: e.rules, Red: red, AssetKey: assetKey}
+	prober.SessionCookies = sessionNames(o, sessNames)
 	pstats, err := prober.Probe(ctx, pages, emit)
 	stats.Probes = pstats.Requests
 	if err != nil {

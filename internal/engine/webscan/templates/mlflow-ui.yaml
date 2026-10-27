@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "mlflow-ui"
+info:
+  title: "MLflow tracking UI reachable"
+  severity: "info"
+  cwe: "CWE-200"
+  what: "An MLflow experiment tracking UI is served at /."
+  why: "This is informational: a reachable ML platform (models, data, and often cloud credentials) tells an attacker which infrastructure to target next."
+  fix: "Restrict the UI to practitioners (VPN or allow-listed IPs), require authentication, and keep MLflow updated."
+  tags: ["service"]
+safety: safe
+http:
+  - method: GET
+    path: ["/"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["MLflow"]

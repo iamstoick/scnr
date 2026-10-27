@@ -300,3 +300,59 @@ func TestDBPasswordRedaction(t *testing.T) {
 		t.Fatal("hash ignores db password")
 	}
 }
+
+func TestLoadAuthFileLogin(t *testing.T) {
+	body := "login:\n  url: http://127.0.0.1:8080/login\n  user: auditor\n  password: s3cret\n  success: Dashboard\n"
+	a, err := LoadAuthFile(writeAuthFile(t, 0o600, body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !a.HasLogin() || a.LoginUser() != "auditor" {
+		t.Fatalf("login spec: %+v", a)
+	}
+	if _, ok := a.LoginFor("127.0.0.1:8080"); ok {
+		t.Fatal("unbound material must not release")
+	}
+	bound := a.WithOrigin("127.0.0.1:8080")
+	spec, ok := bound.LoginFor("127.0.0.1:8080")
+	if !ok || spec.User != "auditor" || spec.Pass != "s3cret" || spec.UserField != "username" || spec.PassField != "password" {
+		t.Fatalf("exact origin: %+v %v", spec, ok)
+	}
+	if _, ok := bound.LoginFor("127.0.0.1:9999"); ok {
+		t.Fatal("released for another port")
+	}
+	// Password reaches the redactor literals and the values hash, never errors.
+	found := false
+	for _, v := range bound.Values() {
+		if v == "s3cret" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("login password missing from redactor literals")
+	}
+	if h1, h2 := a.ValuesHash(), bound.ValuesHash(); h1 == "" || h1 != h2 {
+		t.Fatalf("values hash unstable: %q %q", h1, h2)
+	}
+	merged := MergeAuth(a, nil)
+	if _, ok := merged.WithOrigin("127.0.0.1:8080").LoginFor("127.0.0.1:8080"); !ok {
+		t.Fatal("merge dropped the login spec")
+	}
+}
+
+func TestLoadAuthFileLoginRefusals(t *testing.T) {
+	for name, body := range map[string]string{
+		"missing password": "login:\n  url: http://h/login\n  user: u\n  success: ok\n",
+		"missing success":  "login:\n  url: http://h/login\n  user: u\n  password: p\n",
+		"bad scheme":       "login:\n  url: ftp://h/login\n  user: u\n  password: p\n  success: ok\n",
+		"creds in url":     "login:\n  url: http://u:p@h/login\n  user: u\n  password: p\n  success: ok\n",
+		"pass newline":     "login:\n  url: http://h/login\n  user: u\n  password: \"a\\nb\"\n  success: ok\n",
+		"unknown field":    "login:\n  url: http://h/login\n  user: u\n  password: p\n  success: ok\n  extra2: x\n",
+	} {
+		if _, err := LoadAuthFile(writeAuthFile(t, 0o600, body)); err == nil {
+			t.Fatalf("%s accepted", name)
+		} else if strings.Contains(err.Error(), "s3cret") || strings.Contains(err.Error(), "a\nb") {
+			t.Fatalf("%s leaked value: %v", name, err)
+		}
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -292,6 +293,138 @@ func TestPassiveAndTemplatesAgainstLocalServer(t *testing.T) {
 	p, err := e.Plan(context.Background(), target, o)
 	if err != nil || p.EstRequests < 100 || !p.Network {
 		t.Fatalf("plan %+v %v", p, err)
+	}
+}
+
+// The DevOps-console templates fire on distinctive unauthenticated markers.
+func TestConsoleTemplatesAgainstLocalServer(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("<html><head><title>Harbor</title></head><body>MLflow <title>netdata dashboard</title></body></html>"))
+	})
+	mux.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"Version":"2.19.4","InstanceID":"abc123"}`))
+	})
+	mux.HandleFunc("/api/v1/version", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"Version":"v2.9.3","GitCommit":"deadbee","GitTag":"v2.9.3"}`))
+	})
+	mux.HandleFunc("/minio/health/live", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	mux.HandleFunc("/api/overview", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error":"not_authorised","reason":"login required"}`))
+	})
+	mux.HandleFunc("/login/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<html><head><title>Airflow - login</title></head></html>`))
+	})
+	mux.HandleFunc("/realms/master", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"realm":"master","public_key":"MIIB...","token-service":"x"}`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	e, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	o, _ := newOpts(t, nil, false, nil)
+	target := domain.Target{Raw: srv.URL, Type: domain.TargetURL, Value: srv.URL + "/", Hostname: "127.0.0.1"}
+	got, err := collect(t, e, target, o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"web.tpl.portainer-console", "web.tpl.argocd-api", "web.tpl.minio-console",
+		"web.tpl.rabbitmq-management", "web.tpl.airflow-login", "web.tpl.mlflow-ui",
+		"web.tpl.netdata-dashboard", "web.tpl.keycloak-realm", "web.tpl.harbor-ui"} {
+		if len(got[want]) == 0 {
+			t.Errorf("missing %s (have %v)", want, keys(got))
+		}
+	}
+}
+
+// A configured form login runs once before the scan and the session
+// rides subsequent requests; a wrong success marker fails closed into
+// an unauthenticated scan.
+func TestFormLoginSession(t *testing.T) {
+	var mu sync.Mutex
+	var cookiesSeen []string
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		cookiesSeen = append(cookiesSeen, r.Header.Get("Cookie"))
+		mu.Unlock()
+		w.Write([]byte("<html><head><title>Home</title></head></html>"))
+	})
+	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method", http.StatusMethodNotAllowed)
+			return
+		}
+		if r.FormValue("username") != "auditor" || r.FormValue("password") != "s3cret" {
+			http.Error(w, "nope", http.StatusUnauthorized)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{Name: "session", Value: "abc123", Path: "/"})
+		w.Write([]byte("Welcome back, Dashboard"))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	writeLogin := func(t *testing.T, success string) string {
+		t.Helper()
+		p := filepath.Join(t.TempDir(), "auth.yaml")
+		body := "login:\n  url: " + srv.URL + "/login\n  user: auditor\n  password: s3cret\n  success: " + success + "\n"
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+
+	run := func(t *testing.T, authPath string) map[string][]domain.Finding {
+		t.Helper()
+		a, err := safety.LoadAuthFile(authPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		u, _ := url.Parse(srv.URL)
+		o, _ := newOpts(t, nil, false, nil)
+		o.Auth = a.WithOrigin(safety.OriginHostPort(u))
+		e, err := New()
+		if err != nil {
+			t.Fatal(err)
+		}
+		target := domain.Target{Raw: srv.URL, Type: domain.TargetURL, Value: srv.URL + "/", Hostname: "127.0.0.1"}
+		got, err := collect(t, e, target, o)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+
+	got := run(t, writeLogin(t, "Dashboard"))
+	ok := got["web.login-success"]
+	if len(ok) != 1 || !strings.Contains(ok[0].Title, "auditor") {
+		t.Fatalf("want login-success, got %v", keys(got))
+	}
+	for _, f := range ok {
+		for _, ev := range f.Evidence {
+			if strings.Contains(ev.Redacted, "s3cret") || strings.Contains(ev.Redacted, "abc123") {
+				t.Fatalf("session evidence leaks secret: %+v", ev)
+			}
+		}
+	}
+	mu.Lock()
+	joined := strings.Join(cookiesSeen, ";")
+	mu.Unlock()
+	if !strings.Contains(joined, "session=abc123") {
+		t.Fatalf("session cookie never rode a later request: %q", joined)
+	}
+
+	bad := run(t, writeLogin(t, "NoSuchMarker"))
+	if len(bad["web.login-success"]) != 0 || len(bad["web.login-failed"]) != 1 {
+		t.Fatalf("wrong marker must fail closed: %v", keys(bad))
 	}
 }
 

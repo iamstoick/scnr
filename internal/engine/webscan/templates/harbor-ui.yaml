@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "harbor-ui"
+info:
+  title: "Harbor registry UI reachable"
+  severity: "info"
+  cwe: "CWE-200"
+  what: "A Harbor container registry UI is served at /."
+  why: "This is informational: a reachable registry (images, credentials, and deployment pipelines) tells an attacker which infrastructure to target next."
+  fix: "Restrict the UI to operators (VPN or allow-listed IPs), require authentication, and keep Harbor updated."
+  tags: ["service"]
+safety: safe
+http:
+  - method: GET
+    path: ["/"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["<title>Harbor</title>"]

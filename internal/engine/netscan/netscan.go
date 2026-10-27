@@ -40,7 +40,29 @@ const (
 	bannerBytes    = 1024
 	httpBodyBytes  = 64 << 10
 	expiringSoon   = 14 * 24 * time.Hour
+	// udpTimeout bounds one UDP response wait. Silence is the common
+	// case and means unknown (not closed): without raw sockets there is
+	// no ICMP unreachable to tell open from filtered.
+	udpTimeout = 2 * time.Second
 )
+
+// topUDPPorts are the highest-value UDP probes: resolvers, time, management
+// and amplification-abuse services.
+var topUDPPorts = []int{53, 69, 123, 161, 500, 1194, 1434, 1900, 4500, 5353, 11211}
+
+var udpServiceNames = map[int]string{
+	53:    "dns",
+	69:    "tftp",
+	123:   "ntp",
+	161:   "snmp",
+	500:   "ike",
+	1194:  "openvpn",
+	1434:  "mssql",
+	1900:  "ssdp",
+	4500:  "ipsec-nat-t",
+	5353:  "mdns",
+	11211: "memcached",
+}
 
 var adminPorts = map[int]string{23: "telnet", 3389: "rdp", 5900: "vnc", 5901: "vnc", 5902: "vnc", 5985: "winrm", 5986: "winrm", 512: "rexec", 513: "rlogin", 514: "rsh"}
 
@@ -139,6 +161,52 @@ func (e *Engine) Ports(o engine.Options) []int {
 	}
 }
 
+// UDPPorts returns the UDP probe list: explicit --udp-ports, else the top
+// UDP list. An explicit empty (from "off") disables UDP probing.
+func (e *Engine) UDPPorts(o engine.Options) []int {
+	if o.UDPPorts == nil {
+		return topUDPPorts
+	}
+	return o.UDPPorts
+}
+
+// ParseUDPPorts parses --udp-ports: top | off | comma list / ranges.
+// Empty means the default top list (nil); "off" means none (empty).
+func (e *Engine) ParseUDPPorts(spec string) ([]int, error) {
+	switch strings.ToLower(strings.TrimSpace(spec)) {
+	case "":
+		return nil, nil
+	case "top":
+		return topUDPPorts, nil
+	case "off":
+		return []int{}, nil
+	}
+	seen := map[int]bool{}
+	var out []int
+	for _, part := range strings.Split(spec, ",") {
+		part = strings.TrimSpace(part)
+		lo, hi := part, part
+		if i := strings.Index(part, "-"); i > 0 {
+			lo, hi = part[:i], part[i+1:]
+		}
+		a, err1 := strconv.Atoi(lo)
+		b, err2 := strconv.Atoi(hi)
+		if err1 != nil || err2 != nil || a < 1 || b > 65535 || a > b {
+			return nil, fmt.Errorf("bad udp port spec %q", part)
+		}
+		for p := a; p <= b; p++ {
+			if !seen[p] {
+				seen[p] = true
+				out = append(out, p)
+			}
+		}
+	}
+	if out == nil {
+		out = []int{}
+	}
+	return out, nil
+}
+
 // ParsePorts parses --ports: top100 | top1000 | all | comma list / ranges.
 func (e *Engine) ParsePorts(spec string) ([]int, error) {
 	switch strings.ToLower(strings.TrimSpace(spec)) {
@@ -211,12 +279,16 @@ func (e *Engine) Plan(_ context.Context, t domain.Target, o engine.Options) (eng
 		return engine.Plan{}, err
 	}
 	ports := e.Ports(o)
-	n := len(hosts) * len(ports)
+	udpPorts := e.UDPPorts(o)
+	n := len(hosts) * (len(ports) + len(udpPorts))
 	rate := 100
 	if o.Limiter != nil {
 		rate = o.Limiter.RatePerSec
 	}
 	summary := fmt.Sprintf("%d host(s) x %d port(s) TCP connect, banners, TLS checks at <= %d conn/s", len(hosts), len(ports), rate)
+	if len(udpPorts) > 0 {
+		summary += fmt.Sprintf("; %d UDP response probes", len(udpPorts))
+	}
 	if o.Auth.HasDBCredentials() {
 		summary += fmt.Sprintf("; mysql authenticated enumeration as %q", o.Auth.DBUser())
 	}
@@ -242,6 +314,7 @@ func (e *Engine) Run(ctx context.Context, t domain.Target, o engine.Options, emi
 		return err
 	}
 	ports := e.Ports(o)
+	udpPorts := e.UDPPorts(o)
 	conc := int64(16)
 	if o.Limiter != nil && o.Limiter.PerHostConcurrency > 0 {
 		conc = int64(o.Limiter.PerHostConcurrency)
@@ -258,7 +331,7 @@ func (e *Engine) Run(ctx context.Context, t domain.Target, o engine.Options, emi
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		n, err := e.scanHost(ctx, host, ports, conc, dialer, t, o, safeEmit)
+		n, err := e.scanHost(ctx, host, ports, udpPorts, conc, dialer, t, o, safeEmit)
 		probes += n
 		if err != nil {
 			if o.Stats != nil {
@@ -278,7 +351,7 @@ type hostResult struct {
 	probes  int
 }
 
-func (e *Engine) scanHost(ctx context.Context, host string, ports []int, conc int64, dialer *safety.Dialer, t domain.Target, o engine.Options, emit engine.EmitFunc) (int, error) {
+func (e *Engine) scanHost(ctx context.Context, host string, ports, udpPorts []int, conc int64, dialer *safety.Dialer, t domain.Target, o engine.Options, emit engine.EmitFunc) (int, error) {
 	sem := semaphore.NewWeighted(conc)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -320,10 +393,112 @@ func (e *Engine) scanHost(ctx context.Context, host string, ports []int, conc in
 	if firstErr != nil {
 		return res.probes, firstErr
 	}
+	for _, port := range udpPorts {
+		if err := sem.Acquire(ctx, 1); err != nil {
+			break
+		}
+		wg.Add(1)
+		go func(port int) {
+			defer wg.Done()
+			defer sem.Release(1)
+			if err := e.probeUDP(ctx, dialer, host, port, assetKey, emit); err != nil {
+				mu.Lock()
+				if firstErr == nil {
+					firstErr = err
+				}
+				mu.Unlock()
+			}
+		}(port)
+	}
+	wg.Wait()
+	if firstErr != nil {
+		return res.probes, firstErr
+	}
 	if !res.reached && o.Log != nil {
 		o.Log.Info("host unreachable on all probed ports", "host", host, "ports", len(ports))
 	}
 	return res.probes, ctx.Err()
+}
+
+// probeUDP sends one datagram per payload and reports the port only when
+// something answers. Silence yields nothing: without raw sockets there is
+// no ICMP unreachable to tell open from filtered, so a quiet port is
+// unknown, never closed.
+func (e *Engine) probeUDP(ctx context.Context, dialer *safety.Dialer, host string, port int, assetKey string, emit engine.EmitFunc) error {
+	loc := net.JoinHostPort(host, strconv.Itoa(port)) + "/udp"
+	for _, payload := range udpPayloads(port) {
+		raw, err := dialer.DialContext(ctx, "udp", net.JoinHostPort(host, strconv.Itoa(port)))
+		if err != nil {
+			return refusalOnly(err)
+		}
+		answered, f := udpExchange(raw, payload, e, assetKey, loc, port)
+		raw.Close() //nolint:errcheck // single datagram probe
+		if answered {
+			return emit(f)
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+	}
+	return nil
+}
+
+// udpExchange writes one datagram and waits for a reply. It reports one
+// finding per port at most: the first answer wins.
+func udpExchange(raw net.Conn, payload []byte, e *Engine, assetKey, loc string, port int) (bool, domain.Finding) {
+	_ = raw.SetDeadline(time.Now().Add(udpTimeout))
+	if _, err := raw.Write(payload); err != nil {
+		return false, domain.Finding{}
+	}
+	buf := make([]byte, bannerBytes)
+	n, err := raw.Read(buf)
+	if err != nil {
+		return false, domain.Finding{} // timeout or ICMP unreachable: unknown
+	}
+	service := udpServiceNames[port]
+	f := e.rules.NewFinding("net.open-udp-port", assetKey, loc, domain.Confirmed)
+	if service != "" {
+		f.Title = fmt.Sprintf("Open UDP port %d (%s, answered)", port, service)
+	} else {
+		f.Title = fmt.Sprintf("Open UDP port %d (answered)", port)
+	}
+	red := safety.NewRedactor()
+	detail := fmt.Sprintf("%d-byte UDP response", n)
+	if text := sanitizeBanner(buf[:n]); text != "" {
+		detail += ": " + text
+	}
+	f.Evidence = []domain.Evidence{red.TextEvidence("response", loc, detail)}
+	return true, f
+}
+
+// udpPayloads are the datagrams tried per port: silence first (polite),
+// then a valid query for services that only answer valid requests.
+func udpPayloads(port int) [][]byte {
+	switch port {
+	case 53:
+		return [][]byte{nil, dnsRootQuery()}
+	case 123:
+		return [][]byte{nil, ntpClientPacket()}
+	default:
+		return [][]byte{nil}
+	}
+}
+
+// dnsRootQuery is a minimal RD query for "." NS: any resolver answers,
+// open or not.
+func dnsRootQuery() []byte {
+	return []byte{
+		0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x02, 0x00, 0x01,
+	}
+}
+
+// ntpClientPacket is a mode-3 (client) request: any NTP server replies
+// with a mode-4 packet.
+func ntpClientPacket() []byte {
+	p := make([]byte, 48)
+	p[0] = 0x1b
+	return p
 }
 
 // probe handles one open port: banner, TLS, HTTP label, MySQL audit,

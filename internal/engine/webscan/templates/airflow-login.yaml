@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "airflow-login"
+info:
+  title: "Airflow login page reachable"
+  severity: "info"
+  cwe: "CWE-200"
+  what: "An Apache Airflow scheduler UI serves its login page at /login/."
+  why: "This is informational: a reachable workflow orchestrator (which can execute code) tells an attacker which infrastructure to target next."
+  fix: "Restrict the UI to operators (VPN or allow-listed IPs), require strong auth, and keep Airflow updated."
+  tags: ["service"]
+safety: safe
+http:
+  - method: GET
+    path: ["/login/"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["<[Tt]itle>[^<]*[Aa]irflow"]

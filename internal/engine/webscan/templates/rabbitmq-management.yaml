@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "rabbitmq-management"
+info:
+  title: "RabbitMQ management API reachable"
+  severity: "info"
+  cwe: "CWE-200"
+  what: "The RabbitMQ management API at /api/overview refuses anonymous access (401 not_authorised)."
+  why: "This is informational: a reachable message-broker console tells an attacker which infrastructure to target next."
+  fix: "Restrict the management interface to administrators (VPN or allow-listed IPs) and keep RabbitMQ updated."
+  tags: ["service"]
+safety: safe
+http:
+  - method: GET
+    path: ["/api/overview"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [401]
+      - type: regex
+        regex: ["not_authorised"]

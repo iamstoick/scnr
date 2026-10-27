@@ -31,6 +31,21 @@ type AuthMaterial struct {
 	dbUser  string
 	dbPass  string
 	hasDB   bool
+	login   *LoginSpec
+}
+
+// LoginSpec is one form-login attempt: POST url-encoded fields to URL and
+// keep the session cookies on success. The URL must share the scan
+// target's origin; the attempt runs once, never retried, never guessed.
+type LoginSpec struct {
+	URL          string
+	UserField    string
+	User         string
+	PassField    string
+	Pass         string
+	Extra        map[string]string
+	Success      string
+	Origin       string
 }
 
 // MaxAuthFileBytes caps --auth-file at 64 KiB.
@@ -40,6 +55,21 @@ type authFile struct {
 	Headers map[string]string `yaml:"headers"`
 	Cookies map[string]string `yaml:"cookies"`
 	Mysql   *mysqlAuthFile    `yaml:"mysql"`
+	Login   *loginAuthFile    `yaml:"login"`
+}
+
+// loginAuthFile is the optional form login: {login: {url, user_field,
+// user, password_field, password, extra: {k: v}, success: marker}}.
+// Field names default to username/password; success is a required
+// substring (or /re/ regex) in the post-login response.
+type loginAuthFile struct {
+	URL           string            `yaml:"url"`
+	UserField     string            `yaml:"user_field"`
+	User          string            `yaml:"user"`
+	PasswordField string            `yaml:"password_field"`
+	Password      string            `yaml:"password"`
+	Extra         map[string]string `yaml:"extra"`
+	Success       string            `yaml:"success"`
 }
 
 // mysqlAuthFile is the optional database login: {mysql: {user: name,
@@ -52,9 +82,9 @@ type mysqlAuthFile struct {
 
 // LoadAuthFile reads an --auth-file: strict YAML
 // ({headers: {Name: value}, cookies: {name: value}, mysql: {user,
-// password}}), at most 64 KiB, mode 0600, owned by the current uid,
-// never a symlink. Errors name the path and the reason only: values
-// never appear in them.
+// password}, login: {url, user, password, ...}}), at most 64 KiB, mode
+// 0600, owned by the current uid, never a symlink. Errors name the path
+// and the reason only: values never appear in them.
 func LoadAuthFile(path string) (*AuthMaterial, error) {
 	if err := CheckPrivateFile(path); err != nil {
 		return nil, err
@@ -110,8 +140,45 @@ func LoadAuthFile(path string) (*AuthMaterial, error) {
 		}
 		a.dbUser, a.dbPass, a.hasDB = user, af.Mysql.Password, true
 	}
-	if len(a.headers) == 0 && len(a.cookies) == 0 && !a.hasDB {
-		return nil, fmt.Errorf("auth file %s: no headers, cookies or mysql credentials", path)
+	if af.Login != nil {
+		l := af.Login
+		u, err := url.Parse(strings.TrimSpace(l.URL))
+		if err != nil || u.User != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
+			return nil, fmt.Errorf("auth file %s: login url must be an http(s) URL without credentials", path)
+		}
+		userField, passField := strings.TrimSpace(l.UserField), strings.TrimSpace(l.PasswordField)
+		if userField == "" {
+			userField = "username"
+		}
+		if passField == "" {
+			passField = "password"
+		}
+		user := strings.TrimSpace(l.User)
+		if user == "" || l.Password == "" || strings.TrimSpace(l.Success) == "" {
+			return nil, fmt.Errorf("auth file %s: login needs user, password and success", path)
+		}
+		check := []string{userField, passField, user, l.Password, l.Success}
+		for _, v := range l.Extra {
+			check = append(check, v)
+		}
+		for _, v := range check {
+			if strings.ContainsAny(v, "\r\n\x00") {
+				return nil, fmt.Errorf("auth file %s: login values must not contain line breaks or NUL", path)
+			}
+		}
+		extra := map[string]string{}
+		for k, v := range l.Extra {
+			k = strings.TrimSpace(k)
+			if k == "" {
+				return nil, fmt.Errorf("auth file %s: login extra has an empty field name", path)
+			}
+			extra[k] = v
+		}
+		a.login = &LoginSpec{URL: u.String(), UserField: userField, User: user, PassField: passField,
+			Pass: l.Password, Extra: extra, Success: strings.TrimSpace(l.Success), Origin: OriginHostPort(u)}
+	}
+	if len(a.headers) == 0 && len(a.cookies) == 0 && !a.hasDB && a.login == nil {
+		return nil, fmt.Errorf("auth file %s: no headers, cookies, mysql or login credentials", path)
 	}
 	return a, nil
 }
@@ -171,6 +238,11 @@ func MergeAuth(file, flags *AuthMaterial) *AuthMaterial {
 		if src.hasDB && !out.hasDB {
 			out.dbUser, out.dbPass, out.hasDB = src.dbUser, src.dbPass, true
 		}
+		if src.login != nil && out.login == nil {
+			cp := *src.login
+			cp.Extra = mapsClone(src.login.Extra)
+			out.login = &cp
+		}
 	}
 	return out
 }
@@ -186,6 +258,23 @@ func (a *AuthMaterial) WithOrigin(origin string) *AuthMaterial {
 		out.cookies = append(out.cookies, &cp)
 	}
 	out.dbUser, out.dbPass, out.hasDB = a.dbUser, a.dbPass, a.hasDB
+	if a.login != nil {
+		cp := *a.login
+		cp.Extra = mapsClone(a.login.Extra)
+		out.login = &cp
+	}
+	return out
+}
+
+// mapsClone copies a small string map (nil stays nil).
+func mapsClone(m map[string]string) map[string]string {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
 	return out
 }
 
@@ -232,6 +321,31 @@ func (a *AuthMaterial) CookieCount() int { return len(a.cookies) }
 // not yet checked).
 func (a *AuthMaterial) HasDBCredentials() bool { return a != nil && a.hasDB }
 
+// HasLogin reports whether a form-login spec is present (origin and
+// target match not yet checked).
+func (a *AuthMaterial) HasLogin() bool { return a != nil && a.login != nil }
+
+// LoginUser returns the login username for plan lines. Usernames are
+// not secrets; the password is never exposed except via LoginFor.
+func (a *AuthMaterial) LoginUser() string {
+	if a == nil || a.login == nil {
+		return ""
+	}
+	return a.login.User
+}
+
+// LoginFor releases the login spec only when origin equals the
+// authorised Origin — the same origin check as Apply and DBCredentials.
+// Anything else, including an empty Origin, gets nothing.
+func (a *AuthMaterial) LoginFor(origin string) (*LoginSpec, bool) {
+	if a == nil || a.login == nil || a.Origin == "" || origin != a.Origin {
+		return nil, false
+	}
+	cp := *a.login
+	cp.Extra = mapsClone(a.login.Extra)
+	return &cp, true
+}
+
 // DBUser returns the database login name for plan lines. Usernames are
 // not secrets; the password is never exposed except via DBCredentials.
 func (a *AuthMaterial) DBUser() string {
@@ -276,6 +390,9 @@ func (a *AuthMaterial) Values() []string {
 	if a.hasDB && a.dbPass != "" {
 		out = append(out, a.dbPass)
 	}
+	if a.login != nil {
+		out = append(out, a.login.Pass)
+	}
 	return out
 }
 
@@ -296,6 +413,9 @@ func (a *AuthMaterial) ValuesHash() string {
 	}
 	if a.hasDB {
 		pairs = append(pairs, "mysql:"+a.dbUser+"="+a.dbPass)
+	}
+	if a.login != nil {
+		pairs = append(pairs, "login:"+a.login.URL+"="+a.login.User+"="+a.login.Pass)
 	}
 	sort.Strings(pairs)
 	sum := sha256.Sum256([]byte(strings.Join(pairs, "\n")))

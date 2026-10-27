@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "portainer-console"
+info:
+  title: "Portainer console reachable"
+  severity: "info"
+  cwe: "CWE-200"
+  what: "The Portainer container management API answers at /api/status."
+  why: "This is informational: a reachable management console tells an attacker which infrastructure to target next."
+  fix: "Restrict the console to administrators (VPN or allow-listed IPs) and keep Portainer updated."
+  tags: ["service"]
+safety: safe
+http:
+  - method: GET
+    path: ["/api/status"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["InstanceID"]

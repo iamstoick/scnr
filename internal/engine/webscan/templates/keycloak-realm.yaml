@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "keycloak-realm"
+info:
+  title: "Keycloak realm metadata exposed"
+  severity: "info"
+  cwe: "CWE-200"
+  what: "A Keycloak identity server answers realm metadata at /realms/master."
+  why: "This is informational: a reachable identity provider (plus its public keys and endpoints) tells an attacker where authentication lives."
+  fix: "Restrict admin endpoints to administrators and keep Keycloak updated."
+  tags: ["service"]
+safety: safe
+http:
+  - method: GET
+    path: ["/realms/master"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["public_key"]

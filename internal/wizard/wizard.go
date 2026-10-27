@@ -32,6 +32,7 @@ type ScanRequest struct {
 	Offline        bool
 	MaxHosts       int
 	Ports          string
+	UDPPorts       string
 	Rate           int
 	Concurrency    int
 	Strict         bool
@@ -75,6 +76,9 @@ func (r ScanRequest) Flags() string {
 	}
 	if r.Ports != "" {
 		parts = append(parts, "--ports", r.Ports)
+	}
+	if r.UDPPorts != "" {
+		parts = append(parts, "--udp-ports", r.UDPPorts)
 	}
 	if r.AckAuthorized {
 		parts = append(parts, "--ack-authorized")

@@ -195,3 +195,25 @@ why: Coverage after this point is partial, and results would mix authenticated a
 fix: Re-run; if it recurs, check for logout links whose wording is not in the destructive-word list.
 safety: intrusive
 tags: [web, auth, active]
+---
+id: web.login-success
+engine: webscan
+title: Authenticated session established
+severity: info
+cwe: CWE-200
+what: The configured form login succeeded and the rest of the scan ran with the session cookies.
+why: Authenticated coverage reaches pages anonymous scans cannot see, so findings reflect the logged-in application.
+fix: No action needed. The session cookies are never stored in findings, logs, or the audit trail.
+safety: safe
+tags: [web, auth]
+---
+id: web.login-failed
+engine: webscan
+title: Configured login did not yield a session
+severity: low
+cwe: CWE-287
+what: The configured form login did not produce an authenticated session, so the scan continued unauthenticated.
+why: Coverage is limited to anonymous pages; authenticated flaws are out of reach until login works. Credentials are posted once, only to the login URL's own origin, and never retried.
+fix: Check the login URL, field names, and success marker in the auth file, then re-run.
+safety: safe
+tags: [web, auth]

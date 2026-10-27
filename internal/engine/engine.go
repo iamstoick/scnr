@@ -26,6 +26,10 @@ type Options struct {
 	Online  bool
 	// Ports overrides the profile's port list (from --ports).
 	Ports []int
+	// UDPPorts overrides the UDP probe list (from --udp-ports). Nil means
+	// the engine default top-UDP list; non-nil (even empty) is explicit,
+	// so empty disables UDP probing.
+	UDPPorts []int
 	// Redactor is applied before any Evidence is created.
 	Redactor *safety.Redactor
 	// SecretKey is the per-install key (safety.LoadOrCreateSecret) used to

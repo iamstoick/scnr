@@ -1,0 +1,20 @@
+# scnr embedded template: safe GET-only matchers, RE2 regexes.
+id: "argocd-api"
+info:
+  title: "Argo CD API reachable"
+  severity: "info"
+  cwe: "CWE-200"
+  what: "The Argo CD version endpoint answers at /api/v1/version."
+  why: "This is informational: a reachable deployment console (plus its exact version) tells an attacker which infrastructure to target next."
+  fix: "Restrict the console to administrators (VPN or allow-listed IPs) and keep Argo CD updated."
+  tags: ["service"]
+safety: safe
+http:
+  - method: GET
+    path: ["/api/v1/version"]
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: regex
+        regex: ["GitTag"]
